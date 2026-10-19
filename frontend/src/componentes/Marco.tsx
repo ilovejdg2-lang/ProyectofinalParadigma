@@ -10,6 +10,7 @@ const enlaces = [
   { to: '/mis-cuestionarios', etiqueta: 'Mis cuestionarios' },
   { to: '/cuestionarios/nuevo', etiqueta: 'Crear cuestionario' },
   { to: '/unirse', etiqueta: 'Unirse a una partida' },
+  { to: '/historial', etiqueta: 'Historial' },
   { to: '/perfil', etiqueta: 'Perfil' },
 ]
 

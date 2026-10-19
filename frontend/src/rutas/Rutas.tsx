@@ -6,10 +6,12 @@ import { InicioSesion, Registro } from '../paginas/Acceso.tsx'
 import { Descubrir } from '../paginas/Descubrir.tsx'
 import { DetalleCuestionario } from '../paginas/DetalleCuestionario.tsx'
 import { EditorCuestionario } from '../paginas/EditorCuestionario.tsx'
+import { Historial } from '../paginas/Historial.tsx'
 import { Inicio } from '../paginas/Inicio.tsx'
 import { MisCuestionarios } from '../paginas/MisCuestionarios.tsx'
 import { Partida } from '../paginas/Partida.tsx'
 import { Perfil } from '../paginas/Perfil.tsx'
+import { Resultados } from '../paginas/Resultados.tsx'
 import { SalaAnfitrion } from '../paginas/SalaAnfitrion.tsx'
 import { Unirse } from '../paginas/Unirse.tsx'
 
@@ -34,12 +36,14 @@ export function rutasAplicacion() {
           children: [
             { index: true, element: <Inicio /> },
             { path: '/descubrir', element: <Descubrir /> },
+            { path: '/cuestionarios/:id', element: <DetalleCuestionario /> },
             { path: '/mis-cuestionarios', element: <MisCuestionarios /> },
             { path: '/cuestionarios/nuevo', element: <EditorCuestionario /> },
-            { path: '/cuestionarios/:id', element: <DetalleCuestionario /> },
             { path: '/cuestionarios/:id/editar', element: <EditorCuestionario /> },
             { path: '/unirse', element: <Unirse /> },
             { path: '/sala/:codigo', element: <SalaAnfitrion /> },
+            { path: '/resultados/:codigo', element: <Resultados /> },
+            { path: '/historial', element: <Historial /> },
             { path: '/perfil', element: <Perfil /> },
           ],
         },
