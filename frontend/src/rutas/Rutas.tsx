@@ -9,6 +9,7 @@ import { EditorCuestionario } from '../paginas/EditorCuestionario.tsx'
 import { Inicio } from '../paginas/Inicio.tsx'
 import { MisCuestionarios } from '../paginas/MisCuestionarios.tsx'
 import { Perfil } from '../paginas/Perfil.tsx'
+import { SalaAnfitrion } from '../paginas/SalaAnfitrion.tsx'
 
 export function RutaProtegida() {
   const { perfil, listo } = useAutenticacion()
@@ -34,6 +35,7 @@ export function rutasAplicacion() {
             { path: '/cuestionarios/nuevo', element: <EditorCuestionario /> },
             { path: '/cuestionarios/:id', element: <DetalleCuestionario /> },
             { path: '/cuestionarios/:id/editar', element: <EditorCuestionario /> },
+            { path: '/sala/:codigo', element: <SalaAnfitrion /> },
             { path: '/perfil', element: <Perfil /> },
           ],
         },
