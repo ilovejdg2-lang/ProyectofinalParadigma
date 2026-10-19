@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#101c2e"/>
+  <g fill="none" stroke="#8eb6ff" stroke-width="3">
+    <rect x="70" y="70" width="180" height="80" rx="12"/>
+    <rect x="390" y="210" width="180" height="80" rx="12"/>
+    <path d="M250 110 H320 L390 250"/>
+  </g>
+  <circle cx="320" cy="180" r="34" fill="#2f7cf6"/>
+  <text x="88" y="118" fill="#e8f1ff" font-family="Segoe UI, sans-serif" font-size="24">hecho</text>
+  <text x="408" y="258" fill="#e8f1ff" font-family="Segoe UI, sans-serif" font-size="24">regla</text>
+</svg>

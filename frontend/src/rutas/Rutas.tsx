@@ -3,6 +3,8 @@ import { EstadoCarga } from '../componentes/Interfaz.tsx'
 import { Marco } from '../componentes/Marco.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { InicioSesion, Registro } from '../paginas/Acceso.tsx'
+import { Descubrir } from '../paginas/Descubrir.tsx'
+import { DetalleCuestionario } from '../paginas/DetalleCuestionario.tsx'
 import { Inicio } from '../paginas/Inicio.tsx'
 import { Perfil } from '../paginas/Perfil.tsx'
 
@@ -25,6 +27,8 @@ export function rutasAplicacion() {
           element: <Marco />,
           children: [
             { index: true, element: <Inicio /> },
+            { path: '/descubrir', element: <Descubrir /> },
+            { path: '/cuestionarios/:id', element: <DetalleCuestionario /> },
             { path: '/perfil', element: <Perfil /> },
           ],
         },
