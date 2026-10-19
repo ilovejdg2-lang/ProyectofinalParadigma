@@ -8,6 +8,7 @@ const enlaces = [
   { to: '/', etiqueta: 'Inicio', fin: true },
   { to: '/descubrir', etiqueta: 'Descubrir' },
   { to: '/mis-cuestionarios', etiqueta: 'Mis cuestionarios' },
+  { to: '/cuestionarios/nuevo', etiqueta: 'Crear cuestionario' },
   { to: '/perfil', etiqueta: 'Perfil' },
 ]
 

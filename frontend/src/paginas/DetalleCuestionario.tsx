@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { EstadoCarga, EstadoError } from '../componentes/Interfaz.tsx'
+import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
 import { mensajeDe } from '../dominio/errores.ts'
 import type { Cuestionario } from '../dominio/tipos.ts'
@@ -8,6 +9,7 @@ import type { Cuestionario } from '../dominio/tipos.ts'
 export function DetalleCuestionario() {
   const { id = '' } = useParams()
   const { actividades } = useServicios()
+  const { perfil } = useAutenticacion()
   const [cuestionario, setCuestionario] = useState<Cuestionario | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -33,6 +35,7 @@ export function DetalleCuestionario() {
   if (cargando) return <EstadoCarga />
   if (error && !cuestionario) return <EstadoError mensaje={error} />
   if (!cuestionario) return <EstadoError mensaje="No se encontró el cuestionario." />
+  const propio = perfil?.id === cuestionario.autorId
 
   return (
     <article className="panel">
@@ -51,6 +54,11 @@ export function DetalleCuestionario() {
         ))}
       </ol>
       <div className="acciones">
+        {propio ? (
+          <Link className="boton-fantasma" to={`/cuestionarios/${cuestionario.id}/editar`}>
+            Editar
+          </Link>
+        ) : null}
         <Link className="boton-fantasma" to="/descubrir">
           Volver
         </Link>
