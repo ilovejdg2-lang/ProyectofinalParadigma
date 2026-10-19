@@ -34,7 +34,12 @@ a { color: inherit; }
   outline-offset: 2px;
 }
 
-
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 
 .aplicacion {
   display: grid;
@@ -378,7 +383,10 @@ a { color: inherit; }
 .acceso-globo strong { font-size: 1.35rem; }
 .acceso-globo span { color: #3b82f6; }
 .acceso-globo p { margin: 6px 0 0; color: #c5d0e0; }
-
+@media (max-width: 860px) {
+  .acceso { grid-template-columns: 1fr; }
+  .acceso-hero { display: none; }
+}
 .pregunta-editor {
   border-left: 3px solid var(--azul);
 }
@@ -483,4 +491,19 @@ a { color: inherit; }
 }
 .dialogo .panel { width: min(440px, 100%); display: grid; gap: 12px; }
 
-
+@media (max-width: 860px) {
+  .aplicacion { grid-template-columns: 1fr; }
+  .barra {
+    position: fixed;
+    z-index: 15;
+    transform: translateX(-105%);
+    width: min(280px, 86vw);
+    transition: transform 0.18s ease;
+  }
+  .barra.abierta { transform: none; }
+  .menu-movil { display: inline-flex; }
+  .contenido { padding: 16px; }
+  .respuestas { grid-template-columns: 1fr; }
+  .filtros .seleccion, .filtros .buscador { max-width: none; }
+  .encabezado-pagina { flex-direction: column; align-items: start; }
+}
