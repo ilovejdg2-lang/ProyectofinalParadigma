@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  Proyecto Final Parte 2, EIF400, II Ciclo 2026. Evaluaciones en vivo para ProfeLink.
+  Este cambio cubre solo el frontend web en React y TypeScript.
+  La autenticación, la API de actividades, la base de datos, el tiempo real,
+  Docker, OpenAPI y la observabilidad pertenecen a otros módulos y se consumen por red.
+  La interfaz usa fondo oscuro y azul eléctrico. El catálogo se comporta como una
+  exploración de cuestionarios. Las preguntas son de verdadero o falso.
+  No inventar estadísticas de participación. Los datos de prueba deben identificarse.
+  Las imágenes se muestran desde una URL del servicio, no solo desde el navegador local.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
