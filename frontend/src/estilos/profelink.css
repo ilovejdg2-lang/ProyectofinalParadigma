@@ -23,8 +23,9 @@
 }
 
 * { box-sizing: border-box; }
-html, body, #root { min-height: 100%; }
-body { margin: 0; background: var(--fondo); overflow-wrap: anywhere; }
+html, body, #root { min-height: 100%; max-width: 100%; }
+body { margin: 0; background: var(--fondo); overflow-wrap: anywhere; overflow-x: clip; }
+img { max-width: 100%; height: auto; }
 button, input, select, textarea { font: inherit; color: inherit; min-width: 0; }
 button { cursor: pointer; }
 a { color: inherit; }
@@ -103,6 +104,7 @@ a { color: inherit; }
   border-radius: 12px;
   background: var(--panel);
 }
+.usuario-barra > div { min-width: 0; }
 .avatar {
   width: 36px;
   height: 36px;
@@ -114,7 +116,7 @@ a { color: inherit; }
 }
 .usuario-barra small { color: var(--suave); display: block; }
 .contenido { min-width: 0; padding: 22px; }
-.menu-movil { display: none; }
+.menu-movil, .cortina { display: none; }
 
 .banner {
   position: relative;
@@ -187,7 +189,7 @@ a { color: inherit; }
 
 .rejilla {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
   gap: 16px;
 }
 .tarjeta {
@@ -269,6 +271,8 @@ a { color: inherit; }
 }
 .acceso-formulario {
   width: min(420px, 100%);
+  min-width: 0;
+  max-width: 100%;
   display: grid;
   justify-items: center;
   gap: 12px;
@@ -303,6 +307,8 @@ a { color: inherit; }
 }
 .acceso-campo input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 0;
   border-radius: 10px;
   background: #eef3f8;
@@ -385,6 +391,9 @@ a { color: inherit; }
 .acceso-globo p { margin: 6px 0 0; color: #c5d0e0; }
 @media (max-width: 860px) {
   .acceso { grid-template-columns: 1fr; }
+  .acceso-panel { padding: 28px 16px; align-items: start; }
+  .acceso-formulario { width: 100%; }
+  .acceso-formulario h1 { font-size: clamp(1.35rem, 7vw, 1.7rem); }
   .acceso-hero { display: none; }
 }
 .pregunta-editor {
@@ -403,9 +412,11 @@ a { color: inherit; }
 
 .codigo-sala {
   font-family: var(--mono);
-  font-size: clamp(2rem, 6vw, 3.4rem);
-  letter-spacing: 0.18em;
+  font-size: clamp(1.7rem, 8vw, 3.4rem);
+  letter-spacing: clamp(0.04em, 1.5vw, 0.18em);
   margin: 8px 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .participantes { display: grid; gap: 8px; margin: 12px 0; }
 .participante {
@@ -502,8 +513,19 @@ a { color: inherit; }
   }
   .barra.abierta { transform: none; }
   .menu-movil { display: inline-flex; }
-  .contenido { padding: 16px; }
+  .contenido { padding: 16px 14px 32px; }
   .respuestas { grid-template-columns: 1fr; }
-  .filtros .seleccion, .filtros .buscador { max-width: none; }
+  .filtros .seleccion, .filtros .buscador, .fila > * { width: 100%; max-width: none; flex: 1 1 100%; }
   .encabezado-pagina { flex-direction: column; align-items: start; }
+  .opciones-vf { flex-direction: column; }
+  .banner { padding: 20px 16px; }
+  .cortina {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 14;
+    border: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.5);
+  }
 }

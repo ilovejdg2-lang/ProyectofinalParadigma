@@ -56,8 +56,11 @@ export function Marco() {
           Cerrar sesión
         </button>
       </aside>
+      {abierta ? (
+        <button className="cortina" type="button" aria-label="Cerrar menú" onClick={() => setAbierta(false)} />
+      ) : null}
       <main className="contenido">
-        <button className="boton menu-movil" type="button" onClick={() => setAbierta((valor) => !valor)}>
+        <button className="boton menu-movil" type="button" aria-expanded={abierta} onClick={() => setAbierta((valor) => !valor)}>
           Menú
         </button>
         {simulacion ? (
