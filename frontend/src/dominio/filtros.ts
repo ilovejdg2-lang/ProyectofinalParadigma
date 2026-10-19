@@ -7,6 +7,18 @@ export interface FiltrosCatalogo {
   autor: string
 }
 
+export function acentoDeDificultad(dificultad: string) {
+  if (dificultad === 'facil') return 'verde'
+  if (dificultad === 'dificil') return 'naranja'
+  return 'azul'
+}
+
+export function etiquetaDificultad(dificultad: string) {
+  if (dificultad === 'facil') return 'Fácil'
+  if (dificultad === 'dificil') return 'Difícil'
+  return 'Medio'
+}
+
 export function filtrarCuestionarios(lista: Cuestionario[], filtros: FiltrosCatalogo): Cuestionario[] {
   const texto = filtros.texto.trim().toLowerCase()
   return lista.filter((item) => {

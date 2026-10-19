@@ -4,6 +4,7 @@ import { EstadoCarga, EstadoError, EstadoVacio } from '../componentes/Interfaz.t
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
 import { mensajeDe } from '../dominio/errores.ts'
+import { textoCorrecto } from '../dominio/opciones.ts'
 import { useSala } from './useSala.ts'
 
 export function SalaAnfitrion() {
@@ -42,13 +43,26 @@ export function SalaAnfitrion() {
   const canal = sala.canal === 'simulado' ? 'Canal simulado' : 'Canal en vivo'
 
   return (
-    <section className="panel">
+    <section className="sala-espera">
+      <header className="sala-banda">
+        <div>
+          <p>Comparte este código</p>
+          <p className="codigo-sala">{sala.codigo}</p>
+        </div>
+        <p className="sala-conteo">
+          {sala.participantes.length} {sala.participantes.length === 1 ? 'participante' : 'participantes'}
+        </p>
+      </header>
       <p className="meta">
-        {canal} · {conexion === 'conectado' ? 'Conectado' : 'Sin conexión'}
+        {sala.titulo} · {canal} · {conexion === 'conectado' ? 'Conectado' : 'Sin conexión'} · {sala.estado}
       </p>
-      <h1>{sala.titulo}</h1>
-      <p className="meta">Comparte este código. Estado: {sala.estado}.</p>
-      <p className="codigo-sala">{sala.codigo}</p>
+      {sala.estado === 'esperando' ? (
+        <div className="sala-mosaico" aria-hidden="true">
+          {Array.from({ length: 12 }, (_, indice) => (
+            <span key={indice} />
+          ))}
+        </div>
+      ) : null}
       <div className="acciones">
         <button
           className="boton"
@@ -104,7 +118,7 @@ export function SalaAnfitrion() {
           <h2>{pregunta.enunciado}</h2>
           {pregunta.imagenUrl ? <img className="vista-imagen" src={pregunta.imagenUrl} alt="" /> : null}
           {sala.estado === 'cerrada' ? (
-            <p>Respuesta correcta: {pregunta.respuestaCorrecta ? 'Verdadero' : 'Falso'}</p>
+            <p>Respuesta correcta: {textoCorrecto(pregunta)}</p>
           ) : null}
         </article>
       ) : null}

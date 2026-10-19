@@ -87,7 +87,11 @@ export function crearActividadesSimuladas(
           actualizadoEn: ahora,
         }
         lista[indice] = actualizado
-        guardarLista(almacen, lista)
+        try {
+          guardarLista(almacen, lista)
+        } catch {
+          throw new ErrorServicio('validacion', 'No se pudo guardar la portada. Prueba con una imagen más liviana.')
+        }
         return actualizado
       }
       const creado: Cuestionario = {
@@ -105,7 +109,11 @@ export function crearActividadesSimuladas(
         actualizadoEn: ahora,
       }
       lista.unshift(creado)
-      guardarLista(almacen, lista)
+      try {
+        guardarLista(almacen, lista)
+      } catch {
+        throw new ErrorServicio('validacion', 'No se pudo guardar la portada. Prueba con una imagen más liviana.')
+      }
       return creado
     },
     async eliminar(token, id) {
@@ -125,7 +133,7 @@ export function crearActividadesSimuladas(
       await perfilDe(autenticacion, _token)
       const error = validarImagen(archivo)
       if (error) throw new ErrorServicio('validacion', error)
-      const url = await leerArchivo(archivo)
+      const url = await prepararImagen(archivo)
       return { url, origen: 'simulado' }
     },
   }
@@ -137,6 +145,31 @@ function leerArchivo(archivo: File): Promise<string> {
     lector.onload = () => resolver(String(lector.result))
     lector.onerror = () => rechazar(new ErrorServicio('validacion', 'No se pudo leer la imagen.'))
     lector.readAsDataURL(archivo)
+  })
+}
+
+function prepararImagen(archivo: File): Promise<string> {
+  return leerArchivo(archivo).then((dataUrl) => {
+    if (archivo.type === 'image/svg+xml' || archivo.type === 'image/gif') return dataUrl
+    return new Promise((resolver, rechazar) => {
+      const imagen = new Image()
+      imagen.onload = () => {
+        const maximo = 1200
+        const escala = Math.min(1, maximo / Math.max(imagen.width, imagen.height))
+        const lienzo = document.createElement('canvas')
+        lienzo.width = Math.max(1, Math.round(imagen.width * escala))
+        lienzo.height = Math.max(1, Math.round(imagen.height * escala))
+        const contexto = lienzo.getContext('2d')
+        if (!contexto) {
+          resolver(dataUrl)
+          return
+        }
+        contexto.drawImage(imagen, 0, 0, lienzo.width, lienzo.height)
+        resolver(lienzo.toDataURL('image/jpeg', 0.82))
+      }
+      imagen.onerror = () => rechazar(new ErrorServicio('validacion', 'No se pudo usar esa imagen.'))
+      imagen.src = dataUrl
+    })
   })
 }
 

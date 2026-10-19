@@ -1,5 +1,6 @@
 import { ErrorServicio } from '../dominio/errores.ts'
-import type { Participante, Pregunta, ResumenResultado, Sala } from '../dominio/tipos.ts'
+import { opcionesDe } from '../dominio/opciones.ts'
+import type { Participante, Pregunta, RespuestaParticipante, ResumenResultado, Sala } from '../dominio/tipos.ts'
 import type { ClienteActividades } from './actividades.ts'
 import type { ClienteAutenticacion } from './autenticacion.ts'
 import type { Almacen } from './almacen.ts'
@@ -13,7 +14,7 @@ export interface ClienteSala {
   obtener(token: string, codigo: string): Promise<Sala>
   suscribir(codigo: string, alCambiar: (sala: Sala) => void): () => void
   iniciar(token: string, codigo: string): Promise<Sala>
-  responder(token: string, codigo: string, valor: boolean): Promise<Sala>
+  responder(token: string, codigo: string, valor: boolean | string): Promise<Sala>
   cerrarPregunta(token: string, codigo: string): Promise<Sala>
   avanzar(token: string, codigo: string): Promise<Sala>
   historial(token: string): Promise<ResumenResultado[]>
@@ -78,7 +79,17 @@ function exigirSala(estado: EstadoSalas, codigo: string): Sala {
 }
 
 function copiarPreguntas(preguntas: Pregunta[]): Pregunta[] {
-  return preguntas.map((pregunta) => ({ ...pregunta }))
+  return preguntas.map((pregunta) => ({
+    ...pregunta,
+    opciones: pregunta.opciones?.map((opcion) => ({ ...opcion })),
+  }))
+}
+
+function acierto(pregunta: Pregunta, respuesta: RespuestaParticipante): boolean {
+  if (respuesta.opcionId) {
+    return opcionesDe(pregunta).some((opcion) => opcion.correcta && opcion.id === respuesta.opcionId)
+  }
+  return respuesta.valor === pregunta.respuestaCorrecta
 }
 
 export function crearSalaSimulada(
@@ -233,7 +244,8 @@ export function crearSalaSimulada(
       }
       participante.respuestas.push({
         preguntaId: pregunta.id,
-        valor,
+        valor: typeof valor === 'boolean' ? valor : null,
+        opcionId: typeof valor === 'string' ? valor : undefined,
         aceptada: true,
         tardia: false,
         puntos: 0,
@@ -268,7 +280,7 @@ export function crearSalaSimulada(
           continue
         }
         if (respuesta.puntos > 0) continue
-        if (respuesta.valor === pregunta.respuestaCorrecta) {
+        if (acierto(pregunta, respuesta)) {
           respuesta.puntos = 1
           participante.puntaje += 1
           participante.aciertos += 1
@@ -379,7 +391,11 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
     unirse: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/participantes`, 'POST', {}),
     obtener: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}`, 'GET'),
     iniciar: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/iniciar`, 'POST', {}),
-    responder: (token, codigo, valor) => enviar(token, `/sesiones-juego/${codigo}/respuestas`, 'POST', { valor }),
+    responder: (token, codigo, valor) =>
+      enviar(token, `/sesiones-juego/${codigo}/respuestas`, 'POST', {
+        valor: typeof valor === 'boolean' ? valor : null,
+        opcionId: typeof valor === 'string' ? valor : undefined,
+      }),
     cerrarPregunta: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/cerrar`, 'POST', {}),
     avanzar: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/avanzar`, 'POST', {}),
     async historial(token) {
