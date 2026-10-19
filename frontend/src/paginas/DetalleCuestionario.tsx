@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EstadoCarga, EstadoError } from '../componentes/Interfaz.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
@@ -8,11 +8,13 @@ import type { Cuestionario } from '../dominio/tipos.ts'
 
 export function DetalleCuestionario() {
   const { id = '' } = useParams()
-  const { actividades } = useServicios()
-  const { perfil } = useAutenticacion()
+  const { actividades, sala } = useServicios()
+  const { token, perfil } = useAutenticacion()
+  const navegar = useNavigate()
   const [cuestionario, setCuestionario] = useState<Cuestionario | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
+  const [abriendo, setAbriendo] = useState(false)
 
   useEffect(() => {
     let activo = true
@@ -31,6 +33,19 @@ export function DetalleCuestionario() {
       activo = false
     }
   }, [actividades, id])
+
+  async function iniciar() {
+    if (!token) return
+    setAbriendo(true)
+    try {
+      const creada = await sala.crear(token, id)
+      navegar(`/sala/${creada.codigo}`)
+    } catch (err) {
+      setError(mensajeDe(err))
+    } finally {
+      setAbriendo(false)
+    }
+  }
 
   if (cargando) return <EstadoCarga />
   if (error && !cuestionario) return <EstadoError mensaje={error} />
@@ -53,7 +68,11 @@ export function DetalleCuestionario() {
           <li key={pregunta.id}>{pregunta.enunciado}</li>
         ))}
       </ol>
+      {error ? <p className="error-texto">{error}</p> : null}
       <div className="acciones">
+        <button className="boton" type="button" onClick={() => void iniciar()} disabled={abriendo}>
+          Iniciar partida
+        </button>
         {propio ? (
           <Link className="boton-fantasma" to={`/cuestionarios/${cuestionario.id}/editar`}>
             Editar
