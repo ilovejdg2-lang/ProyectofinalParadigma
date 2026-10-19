@@ -1,8 +1,8 @@
+import { RouterProvider, createBrowserRouter } from 'react-router-dom'
+import { rutasAplicacion } from './rutas/Rutas.tsx'
+
+const enrutador = createBrowserRouter(rutasAplicacion())
+
 export default function App() {
-  return (
-    <main>
-      <h1>ProfeLink</h1>
-      <p>Evaluaciones en vivo</p>
-    </main>
-  )
+  return <RouterProvider router={enrutador} />
 }
