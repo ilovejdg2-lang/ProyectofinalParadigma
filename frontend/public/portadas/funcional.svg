@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#10233f"/>
+  <g fill="none" stroke="#7eb0ff" stroke-width="3">
+    <path d="M40 180 H180"/>
+    <path d="M250 80 H430"/>
+    <path d="M250 280 H430"/>
+    <path d="M460 180 H600"/>
+  </g>
+  <circle cx="210" cy="180" r="46" fill="#2f7cf6"/>
+  <circle cx="430" cy="80" r="28" fill="#4b90ff"/>
+  <circle cx="430" cy="280" r="28" fill="#4b90ff"/>
+  <text x="48" y="48" fill="#d6e6ff" font-family="Segoe UI, sans-serif" font-size="28">f(x)</text>
+</svg>

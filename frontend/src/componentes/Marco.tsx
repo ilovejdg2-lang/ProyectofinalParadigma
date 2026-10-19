@@ -6,6 +6,7 @@ import { useServicios } from '../contexto/ProveedorServicios.tsx'
 
 const enlaces = [
   { to: '/', etiqueta: 'Inicio', fin: true },
+  { to: '/descubrir', etiqueta: 'Descubrir' },
   { to: '/perfil', etiqueta: 'Perfil' },
 ]
 
