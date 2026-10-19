@@ -1,0 +1,24 @@
+# Dependencias y artefactos
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.vite/
+*.local
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# Pruebas visuales
+playwright-report/
+test-results/
+blob-report/
