@@ -4,6 +4,7 @@ import { EstadoCarga, EstadoError } from '../componentes/Interfaz.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
 import { mensajeDe } from '../dominio/errores.ts'
+import { opcionesDe, textoCorrecto } from '../dominio/opciones.ts'
 import { useSala } from './useSala.ts'
 
 export function Partida() {
@@ -40,11 +41,11 @@ export function Partida() {
   const bloqueada = Boolean(respuesta) || sala.estado !== 'pregunta' || enviando || tiempoAgotado
   const porcentaje = sala.cierraEn && sala.estado === 'pregunta' ? Math.min(100, (restante / (sala.segundos * 1000)) * 100) : 0
 
-  async function elegir(valor: boolean) {
+  async function elegir(opcionId: string) {
     if (!token || bloqueada) return
     setEnviando(true)
     try {
-      await cliente.responder(token, sala!.codigo, valor)
+      await cliente.responder(token, sala!.codigo, opcionId)
       setAviso('Respuesta enviada. Espera a que el anfitrión avance.')
     } catch (err) {
       setAviso(mensajeDe(err))
@@ -94,18 +95,23 @@ export function Partida() {
           <h1 className="enunciado">{pregunta.enunciado}</h1>
           {pregunta.imagenUrl ? <img className="vista-imagen" src={pregunta.imagenUrl} alt="" /> : null}
           <div className="respuestas">
-            <button className={respuesta?.valor === true ? 'respuesta verdadero elegida' : 'respuesta verdadero'} type="button" disabled={bloqueada} onClick={() => void elegir(true)}>
-              Verdadero
-            </button>
-            <button className={respuesta?.valor === false ? 'respuesta falso elegida' : 'respuesta falso'} type="button" disabled={bloqueada} onClick={() => void elegir(false)}>
-              Falso
-            </button>
+            {opcionesDe(pregunta).map((opcion, numero) => (
+              <button
+                className={`respuesta tono-${numero % 4}${respuesta?.opcionId === opcion.id ? ' elegida' : ''}`}
+                type="button"
+                key={opcion.id}
+                disabled={bloqueada}
+                onClick={() => void elegir(opcion.id)}
+              >
+                {opcion.texto}
+              </button>
+            ))}
           </div>
           {respuesta ? <p role="status">Respuesta enviada. No puedes cambiarla.</p> : null}
           {tiempoAgotado && !respuesta ? <p role="status">El tiempo terminó. Si envías ahora, la respuesta se rechaza.</p> : null}
           {sala.estado === 'cerrada' ? (
             <div className="panel">
-              <p>Respuesta correcta: {pregunta.respuestaCorrecta ? 'Verdadero' : 'Falso'}</p>
+              <p>Respuesta correcta: {textoCorrecto(pregunta)}</p>
               <p>
                 Tu resultado: {participante?.respuestas.find((item) => item.preguntaId === pregunta.id)?.puntos ?? 0} punto
               </p>

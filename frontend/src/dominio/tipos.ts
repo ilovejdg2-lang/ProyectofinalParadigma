@@ -11,10 +11,17 @@ export interface Sesion {
   perfil: Perfil
 }
 
+export interface OpcionRespuesta {
+  id: string
+  texto: string
+  correcta: boolean
+}
+
 export interface Pregunta {
   id: string
   enunciado: string
   respuestaCorrecta: boolean
+  opciones?: OpcionRespuesta[]
   imagenUrl?: string
   orden: number
 }
@@ -34,10 +41,17 @@ export interface Cuestionario {
   actualizadoEn: string
 }
 
+export interface BorradorOpcion {
+  id: string
+  texto: string
+}
+
 export interface BorradorPregunta {
   id: string
   enunciado: string
   respuestaCorrecta: boolean | null
+  opciones: BorradorOpcion[]
+  opcionCorrectaId: string | null
   imagenUrl?: string
   imagenSimulada: boolean
 }
@@ -58,6 +72,7 @@ export type EstadoSala = 'esperando' | 'pregunta' | 'cerrada' | 'finalizada'
 export interface RespuestaParticipante {
   preguntaId: string
   valor: boolean | null
+  opcionId?: string
   aceptada: boolean
   tardia: boolean
   puntos: number

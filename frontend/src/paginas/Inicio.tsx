@@ -12,21 +12,21 @@ export function Inicio() {
         </p>
       </section>
       <div className="rejilla">
-        <article className="panel">
+        <article className="panel tarjeta-inicio acento-azul">
           <h2>Descubrir</h2>
           <p className="meta">Explora cuestionarios de la clase y elige uno para jugar.</p>
           <Link className="boton" to="/descubrir">
             Ver catálogo
           </Link>
         </article>
-        <article className="panel">
+        <article className="panel tarjeta-inicio acento-naranja">
           <h2>Crear</h2>
           <p className="meta">Arma preguntas de verdadero o falso y adjunta una imagen si la necesitas.</p>
           <Link className="boton" to="/cuestionarios/nuevo">
             Nuevo cuestionario
           </Link>
         </article>
-        <article className="panel">
+        <article className="panel tarjeta-inicio acento-verde">
           <h2>Unirse</h2>
           <p className="meta">Entra con el código que comparte el anfitrión. Tu nombre ya viene del perfil.</p>
           <Link className="boton" to="/unirse">

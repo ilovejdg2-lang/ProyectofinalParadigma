@@ -41,11 +41,11 @@ export function Descubrir() {
     <>
       <header className="encabezado-pagina">
         <div>
-          <h1>Descubrir cuestionarios</h1>
-          <p>Busca una actividad de verdadero o falso y ábrela para jugar.</p>
+          <h1>Descubrir</h1>
+          <p>Elige un cuestionario y ábrelo para jugar como anfitrión.</p>
         </div>
       </header>
-      <div className="filtros">
+      <div className="descubrir-busca">
         <input
           className="buscador"
           placeholder="Buscar un cuestionario..."
@@ -53,6 +53,8 @@ export function Descubrir() {
           onChange={(evento) => setTexto(evento.target.value)}
           aria-label="Buscar un cuestionario"
         />
+      </div>
+      <div className="filtros">
         <select className="seleccion" aria-label="Categoría" value={categoria} onChange={(evento) => setCategoria(evento.target.value)}>
           <option value="">Todas las categorías</option>
           {categorias.map((item) => (
@@ -77,7 +79,7 @@ export function Descubrir() {
       {!cargando && !error && visibles.length === 0 ? (
         <EstadoVacio titulo="No hay cuestionarios para esta búsqueda" detalle="Prueba con otro texto o quita un filtro." />
       ) : null}
-      <div className="rejilla">
+      <div className="rejilla rejilla-descubrir">
         {visibles.map((cuestionario) => (
           <TarjetaCuestionario key={cuestionario.id} cuestionario={cuestionario} />
         ))}

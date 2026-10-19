@@ -1,17 +1,24 @@
 import type { BorradorCuestionario } from './tipos.ts'
 
 export const TIPOS_IMAGEN = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
-export const TAMANO_MAXIMO_IMAGEN = 1_500_000
+export const TAMANO_MAXIMO_IMAGEN = 15_000_000
 
 export function validarImagen(archivo: File): string | null {
-  if (!TIPOS_IMAGEN.includes(archivo.type)) {
+  const tipo = archivo.type === 'image/jpg' ? 'image/jpeg' : archivo.type
+  const extensionOk = /\.(jpe?g|png|webp|gif|svg)$/i.test(archivo.name)
+  const tipoValido = TIPOS_IMAGEN.includes(tipo) || (tipo === '' && extensionOk) || tipo.startsWith('image/')
+  if (!tipoValido) {
     return 'Usa una imagen JPG, PNG, WEBP, GIF o SVG.'
-  }
-  if (archivo.size > TAMANO_MAXIMO_IMAGEN) {
-    return 'La imagen supera 1.5 MB.'
   }
   if (archivo.size === 0) {
     return 'El archivo de imagen está vacío.'
+  }
+  const esVectorOGif = tipo === 'image/gif' || tipo === 'image/svg+xml'
+  if (esVectorOGif && archivo.size > 1_500_000) {
+    return 'Esa imagen supera 1.5 MB.'
+  }
+  if (archivo.size > TAMANO_MAXIMO_IMAGEN) {
+    return 'La imagen supera 15 MB.'
   }
   return null
 }
@@ -36,7 +43,18 @@ export function validarCuestionario(borrador: BorradorCuestionario): string[] {
     if (enunciado.length > 280) {
       errores.push(`La pregunta ${indice + 1} admite como máximo 280 caracteres.`)
     }
-    if (pregunta.respuestaCorrecta === null) {
+    if (pregunta.opciones.length < 2) {
+      errores.push(`La pregunta ${indice + 1} necesita al menos 2 respuestas.`)
+    }
+    if (pregunta.opciones.length > 6) {
+      errores.push(`La pregunta ${indice + 1} admite como máximo 6 respuestas.`)
+    }
+    pregunta.opciones.forEach((opcion, numero) => {
+      if (opcion.texto.trim().length < 1) {
+        errores.push(`La respuesta ${numero + 1} de la pregunta ${indice + 1} está vacía.`)
+      }
+    })
+    if (pregunta.opcionCorrectaId === null && pregunta.respuestaCorrecta === null) {
       errores.push(`Indica la respuesta correcta de la pregunta ${indice + 1}.`)
     }
   })

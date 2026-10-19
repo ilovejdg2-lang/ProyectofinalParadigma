@@ -57,7 +57,7 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
         <form className="acceso-formulario" onSubmit={(evento) => void enviar(evento)}>
           <div className="acceso-marca">
             <span className="acceso-logo">
-              <Buho tamano={46} />
+              <Buho tamano={72} />
             </span>
             <strong>ProfeLink</strong>
             <p>Tu lugar seguro para aprender</p>
@@ -130,8 +130,7 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
       <aside className="acceso-hero" aria-hidden="true">
         <div className="acceso-burbuja">
           <span className="acceso-avatar">
-            <Buho tamano={92} />
-            <i />
+            <Buho tamano={168} />
           </span>
           <div className="acceso-globo">
             <strong>
