@@ -90,6 +90,20 @@ export function EditorCuestionario() {
     setSucio(true)
   }
 
+  async function cargarImagen(archivo: File, destino: 'portada' | string) {
+    if (!token) return
+    try {
+      const resultado = await actividades.cargarImagen(token, archivo)
+      if (destino === 'portada') {
+        actualizar({ imagenUrl: resultado.url, imagenSimulada: resultado.origen === 'simulado' })
+      } else {
+        actualizarPregunta(destino, { imagenUrl: resultado.url, imagenSimulada: resultado.origen === 'simulado' })
+      }
+    } catch (error) {
+      setErrores([mensajeDe(error)])
+    }
+  }
+
   function mover(indice: number, direccion: -1 | 1) {
     const destino = indice + direccion
     if (destino < 0 || destino >= borrador.preguntas.length) return
@@ -151,7 +165,7 @@ export function EditorCuestionario() {
       <header className="encabezado-pagina">
         <div>
           <h1>{edicion ? 'Editar cuestionario' : 'Crear cuestionario'}</h1>
-          <p>Cada pregunta es de verdadero o falso.</p>
+          <p>Cada pregunta es de verdadero o falso. La imagen es opcional.</p>
         </div>
       </header>
       <label className="campo-grupo">
@@ -188,6 +202,22 @@ export function EditorCuestionario() {
         <span>Etiquetas, separadas por coma</span>
         <input className="campo" value={borrador.etiquetas} onChange={(evento) => actualizar({ etiquetas: evento.target.value })} />
       </label>
+      <label className="campo-grupo">
+        <span>Imagen de portada</span>
+        <input
+          className="campo"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+          onChange={(evento) => {
+            const archivo = evento.target.files?.[0]
+            if (archivo) void cargarImagen(archivo, 'portada')
+          }}
+        />
+      </label>
+      {borrador.imagenUrl ? <img className="vista-imagen" src={borrador.imagenUrl} alt="Vista previa de la portada" /> : null}
+      {borrador.imagenSimulada ? (
+        <p className="aviso">Vista previa local. Los otros dispositivos la verán cuando la API de actividades devuelva una URL.</p>
+      ) : null}
       {borrador.preguntas.map((pregunta, indice) => (
         <fieldset className="panel pregunta-editor" key={pregunta.id}>
           <legend>Pregunta {indice + 1}</legend>
@@ -215,6 +245,19 @@ export function EditorCuestionario() {
               Falso
             </button>
           </div>
+          <label className="campo-grupo">
+            <span>Imagen opcional</span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+              onChange={(evento) => {
+                const archivo = evento.target.files?.[0]
+                if (archivo) void cargarImagen(archivo, pregunta.id)
+              }}
+            />
+          </label>
+          {pregunta.imagenUrl ? <img className="vista-imagen" src={pregunta.imagenUrl} alt="" /> : null}
+          {pregunta.imagenSimulada ? <p className="aviso">Imagen simulada en este navegador.</p> : null}
           <div className="acciones">
             <button className="boton-fantasma" type="button" onClick={() => mover(indice, -1)}>
               Subir
