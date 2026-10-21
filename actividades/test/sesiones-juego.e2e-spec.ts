@@ -160,11 +160,12 @@ describe('Sesiones de juego (e2e)', () => {
       .expect(409)
       .expect({ mensaje: 'La partida ya fue iniciada.' });
 
-    await request(app.getHttpServer())
+    const cerrada = await request(app.getHttpServer())
       .post(`/sesiones-juego/${codigo}/cerrar`)
       .set('Authorization', 'Bearer token-ana')
       .send({})
-      .expect(404);
+      .expect(201);
+    expect(comoSala(cerrada.body).estado).toBe('cerrada');
   });
 
   it('rechaza cuestionarios que no se pueden jugar', async () => {

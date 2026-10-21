@@ -30,6 +30,9 @@ import {
 } from './presentacion';
 import { PrismaService } from '../prisma/prisma.service';
 
+const MENSAJE_PARTIDA_ACTIVA =
+  'No se puede quitar una pregunta o una opción de una partida que ya comenzó.';
+
 const arbol = {
   imagen: true,
   preguntas: {
@@ -50,6 +53,11 @@ type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 interface PreguntaLista extends PreguntaEntrada {
   id: string;
   opciones: (OpcionEntrada & { id: string })[];
+}
+
+interface ReferenciasPartida {
+  preguntas: Set<string>;
+  opciones: Set<string>;
 }
 
 @Injectable()
@@ -207,18 +215,66 @@ export class CuestionariosService {
     };
   }
 
+  private async referenciasDePartidasActivas(
+    tx: Tx,
+    cuestionarioId: string,
+  ): Promise<ReferenciasPartida> {
+    const sesiones = await tx.sesionJuego.findMany({
+      where: {
+        cuestionarioId,
+        estado: { in: ['pregunta', 'cerrada'] },
+      },
+      select: { preguntasInstantanea: true },
+    });
+    const referencias: ReferenciasPartida = {
+      preguntas: new Set(),
+      opciones: new Set(),
+    };
+    for (const sesion of sesiones) {
+      const instantanea = sesion.preguntasInstantanea as {
+        preguntas?: Array<{ id?: string; opciones?: Array<{ id?: string }> }>;
+      } | null;
+      for (const pregunta of instantanea?.preguntas ?? []) {
+        if (pregunta.id) referencias.preguntas.add(pregunta.id);
+        for (const opcion of pregunta.opciones ?? []) {
+          if (opcion.id) referencias.opciones.add(opcion.id);
+        }
+      }
+    }
+    return referencias;
+  }
+
+  private retenida(
+    referencias: ReferenciasPartida,
+    pregunta: FilaPregunta,
+  ): boolean {
+    if (referencias.preguntas.has(pregunta.id)) return true;
+    return pregunta.opciones.some((opcion) =>
+      referencias.opciones.has(opcion.id),
+    );
+  }
+
   private async guardarPreguntas(
     tx: Tx,
     cuestionarioId: string,
     preguntas: PreguntaLista[],
     actuales: FilaPregunta[],
   ): Promise<void> {
+    const referencias = await this.referenciasDePartidasActivas(
+      tx,
+      cuestionarioId,
+    );
     for (const actual of actuales) {
       if (preguntas.some((pregunta) => pregunta.id === actual.id)) continue;
-      if ((actual.respuestas?.length ?? 0) > 0) {
+      if (
+        (actual.respuestas?.length ?? 0) > 0 ||
+        this.retenida(referencias, actual)
+      ) {
         throw new ConflictException({
           mensaje:
-            'No se puede modificar una pregunta que ya tiene respuestas en una partida.',
+            (actual.respuestas?.length ?? 0) > 0
+              ? 'No se puede modificar una pregunta que ya tiene respuestas en una partida.'
+              : MENSAJE_PARTIDA_ACTIVA,
         });
       }
       for (const opcion of actual.opciones) {
@@ -255,7 +311,9 @@ export class CuestionariosService {
                 orden: temporal,
               },
         });
-        if (!bloqueada) await this.sincronizarOpciones(tx, actual, pregunta);
+        if (!bloqueada) {
+          await this.sincronizarOpciones(tx, actual, pregunta, referencias);
+        }
       } else {
         const ajena = await tx.pregunta.findFirst({
           where: { id: pregunta.id },
@@ -303,6 +361,7 @@ export class CuestionariosService {
     tx: Tx,
     actual: FilaPregunta,
     pregunta: PreguntaLista,
+    referencias: ReferenciasPartida,
   ): Promise<void> {
     for (const opcion of actual.opciones) {
       if (pregunta.opciones.some((item) => item.id === opcion.id)) continue;
@@ -311,6 +370,9 @@ export class CuestionariosService {
           mensaje:
             'No se puede modificar una pregunta que ya tiene respuestas en una partida.',
         });
+      }
+      if (referencias.opciones.has(opcion.id)) {
+        throw new ConflictException({ mensaje: MENSAJE_PARTIDA_ACTIVA });
       }
       await tx.opcion.delete({ where: { id: opcion.id } });
     }

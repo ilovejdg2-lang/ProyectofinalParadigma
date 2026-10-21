@@ -255,6 +255,58 @@ describe('CuestionariosService', () => {
     );
   });
 
+  it('conserva las preguntas de una partida iniciada aunque todavía nadie responda', async () => {
+    const creado = await servicio.crear(entrada(), ana);
+    memoria.sesiones.push({
+      cuestionarioId: creado.id,
+      estado: 'pregunta',
+      preguntasInstantanea: {
+        version: 1,
+        preguntas: [
+          { id: 'p1', opciones: [{ id: 'p1a' }, { id: 'p1b' }] },
+          { id: 'p2', opciones: [{ id: 'p2a' }, { id: 'p2b' }] },
+        ],
+      },
+    });
+    const sinSegunda = entrada();
+    sinSegunda.preguntas = [sinSegunda.preguntas[0]];
+    const quitada = servicio.actualizar(creado.id, sinSegunda, ana);
+    await expect(quitada).rejects.toBeInstanceOf(ConflictException);
+    const error = await quitada.catch((valor: unknown) => valor);
+    if (error instanceof ConflictException) {
+      expect(error.getResponse()).toEqual({
+        mensaje:
+          'No se puede quitar una pregunta o una opción de una partida que ya comenzó.',
+      });
+    }
+    expect(memoria.preguntas).toHaveLength(2);
+
+    const sustituida = entrada();
+    sustituida.preguntas[0].opciones = [
+      { id: 'p1c', texto: 'Verdadero', correcta: true },
+      { id: 'p1b', texto: 'Falso', correcta: false },
+    ];
+    await expect(
+      servicio.actualizar(creado.id, sustituida, ana),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(memoria.opciones.some((opcion) => opcion.id === 'p1a')).toBe(true);
+
+    const retocada = entrada();
+    retocada.titulo = 'Título editable durante la partida';
+    retocada.preguntas[0].enunciado =
+      'El enunciado vivo puede cambiar sin tocar la instantánea.';
+    const editado = await servicio.actualizar(creado.id, retocada, ana);
+    expect(editado.titulo).toBe('Título editable durante la partida');
+    expect(editado.preguntas[0]?.enunciado).toBe(
+      'El enunciado vivo puede cambiar sin tocar la instantánea.',
+    );
+
+    await servicio.eliminar(creado.id, ana);
+    expect(memoria.preguntas).toHaveLength(2);
+    expect(memoria.cuestionarios[0]?.eliminadoEn).toBeInstanceOf(Date);
+    expect(memoria.sesiones[0]?.estado).toBe('pregunta');
+  });
+
   it('elimina de forma lógica y conserva las preguntas', async () => {
     const creado = await servicio.crear(entrada(), ana);
     await servicio.eliminar(creado.id, ana);

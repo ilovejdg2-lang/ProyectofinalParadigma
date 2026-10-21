@@ -59,6 +59,11 @@ interface EstadoMemoria {
   preguntas: PreguntaFila[];
   opciones: OpcionFila[];
   respuestas: RespuestaFila[];
+  sesiones: Array<{
+    cuestionarioId: string;
+    estado: string;
+    preguntasInstantanea: unknown;
+  }>;
 }
 
 export class PrismaMemoria {
@@ -67,6 +72,11 @@ export class PrismaMemoria {
   preguntas: PreguntaFila[] = [];
   opciones: OpcionFila[] = [];
   respuestas: RespuestaFila[] = [];
+  sesiones: Array<{
+    cuestionarioId: string;
+    estado: string;
+    preguntasInstantanea: unknown;
+  }> = [];
 
   readonly imagen = {
     findFirst: async ({ where }: { where: { url: string } }) =>
@@ -188,6 +198,19 @@ export class PrismaMemoria {
     },
   };
 
+  readonly sesionJuego = {
+    findMany: async ({
+      where,
+    }: {
+      where: { cuestionarioId: string; estado: { in: string[] } };
+    }) =>
+      this.sesiones.filter(
+        (sesion) =>
+          sesion.cuestionarioId === where.cuestionarioId &&
+          where.estado.in.includes(sesion.estado),
+      ),
+  };
+
   async $transaction<T>(operacion: (tx: this) => Promise<T>): Promise<T> {
     const copia = this.copiar();
     try {
@@ -307,6 +330,7 @@ export class PrismaMemoria {
       preguntas: structuredClone(this.preguntas),
       opciones: structuredClone(this.opciones),
       respuestas: structuredClone(this.respuestas),
+      sesiones: structuredClone(this.sesiones),
     };
   }
 
@@ -316,5 +340,6 @@ export class PrismaMemoria {
     this.preguntas = copia.preguntas;
     this.opciones = copia.opciones;
     this.respuestas = copia.respuestas;
+    this.sesiones = copia.sesiones;
   }
 }

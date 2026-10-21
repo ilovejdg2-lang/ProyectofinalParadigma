@@ -25,6 +25,29 @@ export interface CuestionarioMemoria {
   preguntas: PreguntaMemoria[];
 }
 
+interface RespuestaMemoria {
+  id: string;
+  sesionId: string;
+  participanteId: string;
+  preguntaId: string;
+  opcionId: string | null;
+  valor: boolean | null;
+  aceptada: boolean;
+  tardia: boolean;
+  puntos: number;
+  respondidaEn: Date;
+}
+
+interface ResultadoMemoria {
+  id: string;
+  sesionId: string;
+  participanteId: string;
+  puntuacion: number;
+  aciertos: number;
+  incorrectas: number;
+  finalizadoEn: Date;
+}
+
 interface ParticipanteMemoria {
   id: string;
   sesionId: string;
@@ -49,6 +72,7 @@ interface SesionMemoriaFila {
   cierraEn: Date | null;
   preguntasInstantanea: InstantaneaPreguntas | null;
   iniciadaEn: Date | null;
+  finalizadaEn: Date | null;
   participantes: ParticipanteMemoria[];
 }
 
@@ -66,7 +90,10 @@ interface ZonaTransaccion {
 export class SesionMemoria {
   cuestionarios: CuestionarioMemoria[] = [];
   sesiones: SesionMemoriaFila[] = [];
+  respuestas: RespuestaMemoria[] = [];
+  resultados: ResultadoMemoria[] = [];
   fallosCodigoRestantes = 0;
+  fallarResultados = false;
   /** Cede el turno una vez, ya con el candado de la fila tomado. */
   ganchoTrasBloquear: (() => Promise<void>) | null = null;
 
@@ -93,7 +120,11 @@ export class SesionMemoria {
     }: {
       data: Omit<
         SesionMemoriaFila,
-        'cierraEn' | 'preguntasInstantanea' | 'iniciadaEn' | 'participantes'
+        | 'cierraEn'
+        | 'preguntasInstantanea'
+        | 'iniciadaEn'
+        | 'finalizadaEn'
+        | 'participantes'
       >;
     }) => {
       if (this.fallosCodigoRestantes > 0) {
@@ -108,6 +139,7 @@ export class SesionMemoria {
         cierraEn: null,
         preguntasInstantanea: null,
         iniciadaEn: null,
+        finalizadaEn: null,
         participantes: [],
       };
       this.sesiones.push(fila);
@@ -117,18 +149,63 @@ export class SesionMemoria {
       const fila = this.sesiones.find((item) => item.codigo === where.codigo);
       return fila ? this.arbol(fila) : null;
     },
+    findMany: async ({
+      where,
+    }: {
+      where?: {
+        estado?: string;
+        OR?: Array<{
+          anfitrionId?: string;
+          participantes?: { some?: { perfilId?: string } };
+        }>;
+      };
+    }) => {
+      let lista = [...this.sesiones];
+      if (where?.estado) {
+        lista = lista.filter((item) => item.estado === where.estado);
+      }
+      if (where?.OR) {
+        lista = lista.filter((sesion) =>
+          where.OR?.some((clausula) => {
+            if (
+              clausula.anfitrionId &&
+              clausula.anfitrionId === sesion.anfitrionId
+            ) {
+              return true;
+            }
+            const perfil = clausula.participantes?.some?.perfilId;
+            return perfil
+              ? sesion.participantes.some((item) => item.perfilId === perfil)
+              : false;
+          }),
+        );
+      }
+      lista.sort(
+        (a, b) =>
+          (b.finalizadaEn?.getTime() ?? 0) - (a.finalizadaEn?.getTime() ?? 0),
+      );
+      return lista.map((fila) => this.arbol(fila));
+    },
     updateMany: async ({
       where,
       data,
     }: {
-      where: { id: string; estado: 'esperando' };
+      where: {
+        id: string;
+        estado: SesionMemoriaFila['estado'];
+        preguntaActual?: number;
+      };
       data: Partial<SesionMemoriaFila> & {
         estado: SesionMemoriaFila['estado'];
       };
     }) => {
       await this.adquirir(where.id);
       const fila = this.sesiones.find(
-        (item) => item.id === where.id && item.estado === where.estado,
+        (item) =>
+          item.id === where.id &&
+          item.estado === where.estado &&
+          (where.preguntaActual === undefined ||
+            item.preguntaActual === where.preguntaActual),
       );
       if (!fila) return { count: 0 };
       const previo = {
@@ -138,6 +215,7 @@ export class SesionMemoria {
         cierraEn: fila.cierraEn,
         preguntasInstantanea: fila.preguntasInstantanea,
         iniciadaEn: fila.iniciadaEn,
+        finalizadaEn: fila.finalizadaEn,
       };
       this.anotar(() => Object.assign(fila, previo));
       Object.assign(fila, data);
@@ -197,19 +275,132 @@ export class SesionMemoria {
       where,
       data,
     }: {
-      where: { sesionId_perfilId: { sesionId: string; perfilId: string } };
-      data: { nombre: string; conectado: boolean };
+      where:
+        | { id: string }
+        | { sesionId_perfilId: { sesionId: string; perfilId: string } };
+      data: Partial<
+        Pick<
+          ParticipanteMemoria,
+          'nombre' | 'conectado' | 'puntaje' | 'aciertos'
+        >
+      >;
     }) => {
-      const fila = this.participantes().find(
-        (item) =>
-          item.sesionId === where.sesionId_perfilId.sesionId &&
-          item.perfilId === where.sesionId_perfilId.perfilId,
+      const fila = this.participantes().find((item) =>
+        'id' in where
+          ? item.id === where.id
+          : item.sesionId === where.sesionId_perfilId.sesionId &&
+            item.perfilId === where.sesionId_perfilId.perfilId,
       );
       if (!fila) throw errorPrisma('P2025');
-      const antes = { nombre: fila.nombre, conectado: fila.conectado };
+      const antes = {
+        nombre: fila.nombre,
+        conectado: fila.conectado,
+        puntaje: fila.puntaje,
+        aciertos: fila.aciertos,
+      };
       this.anotar(() => Object.assign(fila, antes));
       Object.assign(fila, data);
       return fila;
+    },
+  };
+
+  readonly respuesta = {
+    findMany: async ({
+      where,
+    }: {
+      where: {
+        sesionId?: string;
+        preguntaId?: string;
+        participanteId?: string;
+        aceptada?: boolean;
+      };
+    }) =>
+      this.respuestas.filter(
+        (item) =>
+          (where.sesionId === undefined || item.sesionId === where.sesionId) &&
+          (where.preguntaId === undefined ||
+            item.preguntaId === where.preguntaId) &&
+          (where.participanteId === undefined ||
+            item.participanteId === where.participanteId) &&
+          (where.aceptada === undefined || item.aceptada === where.aceptada),
+      ),
+    create: async ({
+      data,
+    }: {
+      data: Omit<
+        RespuestaMemoria,
+        'respondidaEn' | 'puntos' | 'tardia' | 'aceptada'
+      > & {
+        aceptada?: boolean;
+        tardia?: boolean;
+        puntos?: number;
+      };
+    }) => {
+      const ocupado = this.respuestas.some(
+        (item) =>
+          item.participanteId === data.participanteId &&
+          item.preguntaId === data.preguntaId,
+      );
+      if (ocupado) throw errorPrisma('P2002');
+      const fila: RespuestaMemoria = {
+        ...data,
+        aceptada: data.aceptada ?? true,
+        tardia: data.tardia ?? false,
+        puntos: data.puntos ?? 0,
+        respondidaEn: new Date(),
+      };
+      this.respuestas.push(fila);
+      this.anotar(() => {
+        this.respuestas = this.respuestas.filter((item) => item.id !== fila.id);
+      });
+      return fila;
+    },
+    update: async ({
+      where,
+      data,
+    }: {
+      where: { id: string };
+      data: { puntos: number };
+    }) => {
+      const fila = this.respuestas.find((item) => item.id === where.id);
+      if (!fila) throw errorPrisma('P2025');
+      const antes = fila.puntos;
+      this.anotar(() => {
+        fila.puntos = antes;
+      });
+      fila.puntos = data.puntos;
+      return fila;
+    },
+  };
+
+  readonly resultado = {
+    createMany: async ({
+      data,
+    }: {
+      data: Array<
+        Omit<ResultadoMemoria, 'finalizadoEn'> & { finalizadoEn?: Date }
+      >;
+    }) => {
+      if (this.fallarResultados) throw errorPrisma('P2002');
+      for (const item of data) {
+        const ocupado = this.resultados.some(
+          (existente) =>
+            existente.participanteId === item.participanteId ||
+            (existente.sesionId === item.sesionId &&
+              existente.participanteId === item.participanteId),
+        );
+        if (ocupado) throw errorPrisma('P2002');
+      }
+      const creados = data.map((item) => ({
+        ...item,
+        finalizadoEn: item.finalizadoEn ?? new Date(),
+      }));
+      this.resultados.push(...creados);
+      this.anotar(() => {
+        const ids = new Set(creados.map((item) => item.id));
+        this.resultados = this.resultados.filter((item) => !ids.has(item.id));
+      });
+      return { count: creados.length };
     },
   };
 
@@ -290,9 +481,16 @@ export class SesionMemoria {
     );
     return {
       ...fila,
-      participantes: [...fila.participantes].sort(
-        (a, b) => a.incorporadoEn.getTime() - b.incorporadoEn.getTime(),
-      ),
+      participantes: [...fila.participantes]
+        .sort((a, b) => a.incorporadoEn.getTime() - b.incorporadoEn.getTime())
+        .map((participante) => ({
+          ...participante,
+          respuestas: this.respuestas
+            .filter((respuesta) => respuesta.participanteId === participante.id)
+            .sort(
+              (a, b) => a.respondidaEn.getTime() - b.respondidaEn.getTime(),
+            ),
+        })),
       cuestionario: cuestionario ? this.cuestionarioArbol(cuestionario) : null,
     };
   }
