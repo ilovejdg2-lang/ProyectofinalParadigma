@@ -1,6 +1,6 @@
 # API de actividades
 
-Backend de cuestionarios, sesiones y resultados de ProfeLink. La fase 1 dejó NestJS, Prisma y el modelo en PostgreSQL. La fase 2 expone el CRUD de cuestionarios, preguntas y opciones. La fase 3 sube imágenes al bucket público de Supabase Storage. Las partidas y la autenticación real siguen fuera de esta API.
+Backend de cuestionarios, sesiones y resultados de ProfeLink. La fase 1 dejó NestJS, Prisma y el modelo en PostgreSQL. La fase 2 expone el CRUD de cuestionarios, preguntas y opciones. La fase 3 sube imágenes al bucket público de Supabase Storage. La fase 4 crea salas, incorpora participantes e inicia la partida. Las respuestas, las puntuaciones y la autenticación real siguen fuera de esta API.
 
 ## Configuración
 
@@ -68,6 +68,25 @@ Los errores usan `{ "mensaje": "..." }`. Sin un verificador de identidad real, l
 
 El backend acepta JPEG, PNG, WebP y GIF de hasta 5 MB, y comprueba la firma del archivo. Un SVG válido se convierte en memoria a PNG y solo ese PNG se sube al bucket; el archivo original no se guarda. El frontend todavía permite seleccionar archivos de hasta 15 MB: el límite real de esta API es 5 MB y conviene alinearlo después. Un archivo más grande responde 413. Sin `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_STORAGE_BUCKET`, la subida responde 503. Las pruebas sustituyen el almacenamiento y no escriben objetos en el bucket.
 
+## Sesiones de juego
+
+| Método | Ruta | Acceso |
+|---|---|---|
+| `POST` | `/sesiones-juego` | Autenticado. Cuerpo `{ "cuestionarioId": "..." }` |
+| `GET` | `/sesiones-juego/:codigo` | Autenticado. Estado vigente, sin crear participantes |
+| `POST` | `/sesiones-juego/:codigo/participantes` | Autenticado. Entra o reconecta al perfil verificado |
+| `POST` | `/sesiones-juego/:codigo/iniciar` | Solo el anfitrión, y solo desde `esperando` |
+
+El código tiene seis caracteres del alfabeto `A-Z` y `2-9`, sin `0`, `1`, `I` ni `O`. La unicidad la garantiza el índice de PostgreSQL; si choca, se genera otro hasta ocho veces. Cualquier identidad verificada puede ser anfitrión de un cuestionario que exista, no esté eliminado y tenga preguntas con al menos dos opciones y una sola correcta.
+
+Una persona nueva solo entra mientras la sala está en `esperando`. Quien ya participa puede volver a entrar en `pregunta` o `cerrada` y recupera el mismo registro. `finalizada` rechaza la entrada. El cuerpo no puede fijar `anfitrionId` ni `perfilId`.
+
+Al iniciar se copian preguntas y opciones en `preguntasInstantanea`, se fija `iniciadaEn` y `cierraEn` con el reloj del servidor, y el estado pasa a `pregunta`. Esa copia no se vuelve a leer del cuestionario editable. La respuesta pública no incluye `correcta` ni `respuestaCorrecta` de la pregunta abierta ni de las que todavía no se juegan. En `esperando` tampoco envía enunciados ni opciones: la pantalla de espera no los muestra. El arreglo `preguntas` conserva el total de casillas, con las futuras vacías, para que `preguntaActual` y el texto "Pregunta X de N" sigan coincidiendo con el frontend. En `cerrada` o `finalizada` solo se revelan las preguntas de índice menor o igual a `preguntaActual`. Cerrar, avanzar, responder y puntuar pertenecen a la fase 5 y esas rutas no existen.
+
+Unirse e iniciar bloquean la fila de la sesión con `SELECT … FOR UPDATE` hasta cerrar la transacción. Así un alta nueva no puede colarse después de que el inicio ya cambió el estado. Quien ya participa puede reconectar en esa misma ventana. El índice único `(sesionId, perfilId)` sigue impidiendo duplicados.
+
+`AvisoSesiones` recibe `sala-creada`, `participante-incorporado` y `partida-iniciada` solo después de confirmar la transacción. No abre un canal en vivo. La persona 3 puede sustituir esa clase; una entrega fiable entre procesos necesitaría un outbox, que no está implementado.
+
 ## Migraciones
 
 La migración inicial está en `prisma/migrations/20261021013000_inicial`. Solo crea objetos de ProfeLink. No borra tablas.
@@ -99,4 +118,4 @@ Los datos de demostración pertenecen a `perfil-demo` / `Docente de prueba`, el 
 
 ## Historial de partidas
 
-Un cuestionario con sesiones no se puede borrar en cascada (`ON DELETE RESTRICT`) y tiene `eliminadoEn` para un borrado lógico. Al iniciar una partida, la fase correspondiente debe copiar las preguntas en `preguntasInstantanea`. Así una edición posterior no cambia lo que ya se jugó.
+Un cuestionario con sesiones no se puede borrar en cascada (`ON DELETE RESTRICT`) y tiene `eliminadoEn` para un borrado lógico. Al iniciar, la sala guarda la copia en `preguntasInstantanea`. Las respuestas de cada participante y el cierre con calificación quedan para la fase 5.
