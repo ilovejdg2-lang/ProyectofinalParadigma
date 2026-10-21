@@ -136,7 +136,9 @@ describe('SesionesJuegoService', () => {
     expect(conLuis.participantes).toHaveLength(1);
 
     await servicio.unirse(sala.codigo, { id: 'marta', nombre: 'Marta' });
-    expect((await servicio.obtener(sala.codigo)).participantes).toHaveLength(2);
+    expect(
+      (await servicio.obtener(sala.codigo, ana)).participantes,
+    ).toHaveLength(2);
     expect(avisos.recientes().map((aviso) => aviso.tipo)).toEqual([
       'sala-creada',
       'participante-incorporado',
@@ -160,7 +162,7 @@ describe('SesionesJuegoService', () => {
       servicio.unirse(sala.codigo, { id: 'marta', nombre: 'Marta' }),
       servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' }),
     ]);
-    const actual = await servicio.obtener(sala.codigo);
+    const actual = await servicio.obtener(sala.codigo, ana);
     expect(actual.participantes.map((item) => item.perfilId).sort()).toEqual([
       'luis',
       'marta',
@@ -205,7 +207,7 @@ describe('SesionesJuegoService', () => {
     memoria.cuestionarios[0].preguntas[0].enunciado =
       'Enunciado editado después';
     memoria.cuestionarios[0].preguntas[0].opciones[0].correcta = false;
-    const vigente = await servicio.obtener(sala.codigo);
+    const vigente = await servicio.obtener(sala.codigo, ana);
     expect(vigente.preguntas[0].enunciado).toBe(
       'Una función pura no tiene efectos externos.',
     );
@@ -250,23 +252,23 @@ describe('SesionesJuegoService', () => {
   it('consulta la sala sin crear participantes y oculta las soluciones mientras sigue abierta', async () => {
     const { servicio, memoria } = armar();
     const sala = await servicio.crear('quiz-1', ana);
-    const consulta = await servicio.obtener(sala.codigo.toLowerCase());
+    const consulta = await servicio.obtener(sala.codigo.toLowerCase(), ana);
     expect(consulta.participantes).toEqual([]);
     expect(consulta.codigo).toBe(sala.codigo);
 
-    const ausente = await rechazo(servicio.obtener('ZZZZZZ'));
+    const ausente = await rechazo(servicio.obtener('ZZZZZZ', ana));
     expect(ausente).toBeInstanceOf(NotFoundException);
     expect(ausente.getResponse().mensaje).toBe(
       'No hay una sala con ese código.',
     );
 
     await servicio.unirse(sala.codigo, luis);
-    const otraVez = await servicio.obtener(sala.codigo);
+    const otraVez = await servicio.obtener(sala.codigo, ana);
     expect(otraVez.participantes).toHaveLength(1);
 
     await servicio.iniciar(sala.codigo, ana);
     memoria.sesiones[0].estado = 'cerrada';
-    const revelada = await servicio.obtener(sala.codigo);
+    const revelada = await servicio.obtener(sala.codigo, ana);
     expect(revelada.preguntas[0].respuestaCorrecta).toBe(true);
     expect(
       revelada.preguntas[0].opciones.find((opcion) => opcion.id === 'p1a')
@@ -343,7 +345,7 @@ describe('SesionesJuegoService', () => {
     expect(JSON.stringify(abierta)).not.toContain('herencia');
 
     memoria.sesiones[0].estado = 'cerrada';
-    const cerrada = await servicio.obtener(sala.codigo);
+    const cerrada = await servicio.obtener(sala.codigo, ana);
     expect(cerrada.preguntas[0].respuestaCorrecta).toBe(true);
     expect(cerrada.preguntas[0].opciones[0]).toEqual({
       id: 'p1a',
@@ -367,7 +369,7 @@ describe('SesionesJuegoService', () => {
     });
     memoria.sesiones[0].estado = 'finalizada';
     memoria.sesiones[0].preguntaActual = 1;
-    const finalizada = await servicio.obtener(sala.codigo);
+    const finalizada = await servicio.obtener(sala.codigo, ana);
     expect(finalizada.preguntas).toHaveLength(3);
     expect(finalizada.preguntas[0].respuestaCorrecta).toBe(true);
     expect(finalizada.preguntas[1].enunciado).toBe(
@@ -444,7 +446,7 @@ describe('SesionesJuegoService', () => {
         respuestas: [],
       }),
     ]);
-    const vigente = await servicio.obtener(sala.codigo);
+    const vigente = await servicio.obtener(sala.codigo, ana);
     expect(vigente.participantes).toHaveLength(1);
     expect(vigente).toMatchObject({
       codigo: sala.codigo,

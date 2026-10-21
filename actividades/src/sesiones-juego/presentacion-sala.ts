@@ -20,6 +20,15 @@ export interface InstantaneaPreguntas {
   preguntas: PreguntaInstantanea[];
 }
 
+export interface RespuestaPublica {
+  preguntaId: string;
+  valor: boolean | null;
+  opcionId?: string;
+  aceptada: boolean;
+  tardia: boolean;
+  puntos: number;
+}
+
 export interface ParticipantePublico {
   id: string;
   perfilId: string;
@@ -27,7 +36,7 @@ export interface ParticipantePublico {
   conectado: boolean;
   puntaje: number;
   aciertos: number;
-  respuestas: [];
+  respuestas: RespuestaPublica[];
 }
 
 export interface SalaPublica {
@@ -69,6 +78,16 @@ export interface FilaPregunta {
   opciones: FilaOpcion[];
 }
 
+export interface FilaRespuesta {
+  preguntaId: string;
+  valor: boolean | null;
+  opcionId: string | null;
+  aceptada: boolean;
+  tardia: boolean;
+  puntos: number;
+  respondidaEn?: Date | string;
+}
+
 export interface FilaParticipante {
   id: string;
   perfilId: string;
@@ -77,6 +96,7 @@ export interface FilaParticipante {
   puntaje: number;
   aciertos: number;
   incorporadoEn?: Date | string;
+  respuestas?: FilaRespuesta[];
 }
 
 export interface FilaSesion {
@@ -90,6 +110,7 @@ export interface FilaSesion {
   preguntaActual: number;
   segundos: number;
   cierraEn: Date | string | null;
+  finalizadaEn?: Date | string | null;
   preguntasInstantanea?: unknown;
   cuestionario?: {
     eliminadoEn?: Date | string | null;
@@ -149,9 +170,14 @@ function visibilidad(fila: FilaSesion, indice: number): Visibilidad {
   return 'abierta';
 }
 
-export function presentarSala(fila: FilaSesion): SalaPublica {
+export function presentarSala(
+  fila: FilaSesion,
+  perfilId?: string,
+): SalaPublica {
   const instantanea = leerInstantanea(fila.preguntasInstantanea);
   const preguntas = instantanea?.preguntas ?? enVivo(fila);
+  const abierta =
+    fila.estado === 'pregunta' ? preguntas[fila.preguntaActual]?.id : undefined;
   return {
     codigo: fila.codigo,
     cuestionarioId: fila.cuestionarioId,
@@ -172,7 +198,15 @@ export function presentarSala(fila: FilaSesion): SalaPublica {
         conectado: participante.conectado,
         puntaje: participante.puntaje,
         aciertos: participante.aciertos,
-        respuestas: [],
+        respuestas: [...(participante.respuestas ?? [])]
+          .sort((a, b) => fechaRespuesta(a) - fechaRespuesta(b))
+          .map((respuesta) =>
+            presentarRespuesta(
+              respuesta,
+              participante.perfilId === perfilId,
+              abierta,
+            ),
+          ),
       })),
     preguntas: preguntas.map((pregunta, indice) =>
       presentarPregunta(pregunta, visibilidad(fila, indice)),
@@ -211,7 +245,60 @@ function presentarPregunta(
   };
 }
 
+function presentarRespuesta(
+  respuesta: FilaRespuesta,
+  propia: boolean,
+  preguntaAbierta: string | undefined,
+): RespuestaPublica {
+  const ocultar = !propia && respuesta.preguntaId === preguntaAbierta;
+  return {
+    preguntaId: respuesta.preguntaId,
+    valor: ocultar ? null : respuesta.valor,
+    ...(!ocultar && respuesta.opcionId ? { opcionId: respuesta.opcionId } : {}),
+    aceptada: respuesta.aceptada,
+    tardia: respuesta.tardia,
+    puntos: respuesta.puntos,
+  };
+}
+
 function fecha(participante: FilaParticipante): number {
   if (!participante.incorporadoEn) return 0;
   return new Date(participante.incorporadoEn).getTime();
+}
+
+function fechaRespuesta(respuesta: FilaRespuesta): number {
+  if (!respuesta.respondidaEn) return 0;
+  return new Date(respuesta.respondidaEn).getTime();
+}
+
+export interface ResumenPublico {
+  codigo: string;
+  titulo: string;
+  finalizadaEn: string;
+  anfitrionId: string;
+  participantes: ParticipantePublico[];
+}
+
+export function presentarResultado(fila: FilaSesion): ResumenPublico {
+  const sala = presentarSala(fila);
+  return {
+    codigo: sala.codigo,
+    titulo: sala.titulo,
+    finalizadaEn: fila.finalizadaEn
+      ? new Date(fila.finalizadaEn).toISOString()
+      : new Date(0).toISOString(),
+    anfitrionId: sala.anfitrionId,
+    participantes: ordenarClasificacion(sala.participantes),
+  };
+}
+
+export function ordenarClasificacion(
+  participantes: ParticipantePublico[],
+): ParticipantePublico[] {
+  return [...participantes].sort(
+    (a, b) =>
+      b.puntaje - a.puntaje ||
+      b.aciertos - a.aciertos ||
+      a.nombre.localeCompare(b.nombre, 'es'),
+  );
 }
