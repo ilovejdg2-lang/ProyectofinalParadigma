@@ -75,7 +75,16 @@ function servicioCon(memoria: PrismaMemoria) {
       estaListo: () => true,
     } as unknown as PrismaService,
     new PreguntasService(),
-    new ImagenesService(),
+    new ImagenesService(
+      {
+        obtener: () => memoria,
+        estaListo: () => true,
+      } as unknown as PrismaService,
+      {
+        subir: () => Promise.reject(new Error('almacen no usado')),
+        retirar: () => Promise.resolve(),
+      },
+    ),
     verificador,
   );
 }

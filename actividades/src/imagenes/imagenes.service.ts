@@ -1,5 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { IdentidadExterna } from '../autenticacion/identidad-externa';
+import { PrismaService } from '../prisma/prisma.service';
+import { AlmacenImagenes } from './almacen-imagenes';
+import { ArchivoRecibido, prepararImagen } from './validar-archivo';
 
 interface ImagenTx {
   imagen: {
@@ -18,6 +22,45 @@ interface ImagenTx {
 
 @Injectable()
 export class ImagenesService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly almacen: AlmacenImagenes,
+  ) {}
+
+  async guardar(
+    archivo: ArchivoRecibido | undefined,
+    identidad: IdentidadExterna,
+  ): Promise<{ url: string }> {
+    const leida = await prepararImagen(archivo);
+    if (!this.prisma.estaListo()) {
+      throw new ServiceUnavailableException({
+        mensaje: 'La base de datos no está disponible.',
+      });
+    }
+    const id = randomUUID();
+    const ruta = `${segmento(identidad.id)}/${id}.${leida.extension}`;
+    const url = await this.almacen.subir({
+      ruta,
+      tipoMime: leida.tipoMime,
+      contenido: leida.contenido,
+    });
+    try {
+      await this.prisma.obtener().imagen.create({
+        data: {
+          id,
+          nombreArchivo: leida.nombreArchivo,
+          url,
+          tipoMime: leida.tipoMime,
+          tamanoBytes: leida.contenido.length,
+        },
+      });
+    } catch (error) {
+      await this.almacen.retirar(ruta).catch(() => undefined);
+      throw error;
+    }
+    return { url };
+  }
+
   async asegurar(tx: ImagenTx, url?: string | null): Promise<string | null> {
     const limpia = url?.trim();
     if (!limpia) return null;
@@ -36,9 +79,14 @@ export class ImagenesService {
   }
 }
 
+function segmento(id: string): string {
+  const limpio = id.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+  return limpio || 'autor';
+}
+
 function nombreDe(url: string): string {
-  const segmento = url.split('/').pop() ?? 'imagen';
-  const limpio = segmento.split('?')[0] || 'imagen';
+  const segmentoUrl = url.split('/').pop() ?? 'imagen';
+  const limpio = segmentoUrl.split('?')[0] || 'imagen';
   return limpio.slice(0, 120);
 }
 
