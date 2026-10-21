@@ -1,6 +1,6 @@
 # API de actividades
 
-Backend de cuestionarios, sesiones y resultados de ProfeLink. La fase 1 dejó NestJS, Prisma y el modelo en PostgreSQL. La fase 2 expone el CRUD de cuestionarios, preguntas y opciones. Las partidas, las imágenes binarias y la autenticación real siguen fuera de esta API.
+Backend de cuestionarios, sesiones y resultados de ProfeLink. La fase 1 dejó NestJS, Prisma y el modelo en PostgreSQL. La fase 2 expone el CRUD de cuestionarios, preguntas y opciones. La fase 3 sube imágenes al bucket público de Supabase Storage. Las partidas y la autenticación real siguen fuera de esta API.
 
 ## Configuración
 
@@ -61,6 +61,12 @@ Las consultas públicas omiten `correcta` y `respuestaCorrecta`. El propietario 
 El cuerpo usa la forma del frontend: título, descripción, categoría, etiquetas, dificultad, imagen opcional, preguntas y opciones. `autorId` no se acepta en el cuerpo; sale de la identidad verificada. Un identificador de pregunta u opción que ya exista en otro cuestionario responde 409. Si la pregunta ya tiene respuestas de una partida, su contenido no se puede cambiar ni borrar.
 
 Los errores usan `{ "mensaje": "..." }`. Sin un verificador de identidad real, las rutas privadas responden 401. Si PostgreSQL no está disponible, el catálogo responde 503.
+
+## Imágenes
+
+`POST /imagenes` recibe el campo `archivo` y exige la misma autenticación que crear un cuestionario. La respuesta es `{ "url": "..." }`, la URL pública del bucket. Esa URL se puede enviar después en `imagenUrl` del cuestionario o de una pregunta; el CRUD reutiliza el metadato y no crea otro registro.
+
+El backend acepta JPEG, PNG, WebP y GIF de hasta 5 MB, y comprueba la firma del archivo. Un SVG válido se convierte en memoria a PNG y solo ese PNG se sube al bucket; el archivo original no se guarda. El frontend todavía permite seleccionar archivos de hasta 15 MB: el límite real de esta API es 5 MB y conviene alinearlo después. Un archivo más grande responde 413. Sin `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_STORAGE_BUCKET`, la subida responde 503. Las pruebas sustituyen el almacenamiento y no escriben objetos en el bucket.
 
 ## Migraciones
 
