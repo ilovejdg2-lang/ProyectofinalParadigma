@@ -1,0 +1,184 @@
+// Modelo de la API de actividades. Los identificadores son texto para
+// aceptar tanto UUID nuevos como los id estables de los datos de demostración
+// que ya usa el frontend (por ejemplo demo-funcional, f1).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Dificultad {
+  facil
+  medio
+  dificil
+}
+
+enum EstadoSesion {
+  esperando
+  pregunta
+  cerrada
+  finalizada
+}
+
+/// Metadatos de un archivo. El binario no se guarda en PostgreSQL.
+model Imagen {
+  id            String   @id
+  nombreArchivo String
+  url           String
+  tipoMime      String
+  tamanoBytes   Int
+  creadoEn      DateTime @default(now()) @db.Timestamptz(3)
+
+  cuestionarios Cuestionario[]
+  preguntas     Pregunta[]
+}
+
+model Cuestionario {
+  id            String     @id @default(uuid())
+  autorId       String
+  autorNombre   String
+  titulo        String     @db.VarChar(80)
+  descripcion   String     @db.VarChar(400)
+  categoria     String     @db.VarChar(80)
+  etiquetas     String[]
+  dificultad    Dificultad
+  esDemostracion Boolean   @default(false)
+  imagenId      String?
+  imagen        Imagen?    @relation(fields: [imagenId], references: [id], onDelete: SetNull)
+  creadoEn      DateTime   @default(now()) @db.Timestamptz(3)
+  actualizadoEn DateTime   @updatedAt @db.Timestamptz(3)
+  /// Borrado lógico. Las sesiones históricas siguen apuntando a esta fila.
+  eliminadoEn   DateTime?  @db.Timestamptz(3)
+
+  preguntas Pregunta[]
+  sesiones  SesionJuego[]
+
+  @@index([autorId])
+  @@index([categoria])
+  @@index([eliminadoEn])
+}
+
+model Pregunta {
+  id                 String   @id @default(uuid())
+  cuestionarioId     String
+  cuestionario       Cuestionario @relation(fields: [cuestionarioId], references: [id], onDelete: Restrict)
+  enunciado          String   @db.VarChar(280)
+  orden              Int
+  /// Compatible con el contrato del frontend. Si hay opciones, la opción
+  /// marcada como correcta es la fuente de verdad al puntuar.
+  respuestaCorrecta  Boolean
+  /// Tope opcional de esta pregunta. Si es nulo, la sesión usa sus segundos.
+  segundos           Int?
+  imagenId           String?
+  imagen             Imagen?  @relation(fields: [imagenId], references: [id], onDelete: SetNull)
+  creadoEn           DateTime @default(now()) @db.Timestamptz(3)
+  actualizadoEn      DateTime @updatedAt @db.Timestamptz(3)
+
+  opciones   Opcion[]
+  respuestas Respuesta[]
+
+  @@unique([cuestionarioId, orden])
+  @@index([cuestionarioId])
+}
+
+model Opcion {
+  id         String   @id @default(uuid())
+  preguntaId String
+  pregunta   Pregunta @relation(fields: [preguntaId], references: [id], onDelete: Restrict)
+  texto      String   @db.VarChar(280)
+  orden      Int
+  correcta   Boolean  @default(false)
+
+  respuestas Respuesta[]
+
+  @@unique([preguntaId, orden])
+  @@index([preguntaId])
+}
+
+model SesionJuego {
+  id                   String       @id @default(uuid())
+  codigo               String       @unique @db.VarChar(6)
+  cuestionarioId       String
+  cuestionario         Cuestionario @relation(fields: [cuestionarioId], references: [id], onDelete: Restrict)
+  /// Copia del título al crear la sala, para el historial.
+  titulo               String       @db.VarChar(80)
+  anfitrionId          String
+  anfitrionNombre      String
+  estado               EstadoSesion @default(esperando)
+  preguntaActual       Int          @default(0)
+  segundos             Int          @default(20)
+  cierraEn             DateTime?    @db.Timestamptz(3)
+  /// Copia de preguntas y opciones al iniciar. Conserva el enunciado y la
+  /// respuesta que se jugaron aunque el cuestionario se edite después.
+  preguntasInstantanea Json?
+  creadoEn             DateTime     @default(now()) @db.Timestamptz(3)
+  iniciadaEn           DateTime?    @db.Timestamptz(3)
+  finalizadaEn         DateTime?    @db.Timestamptz(3)
+
+  participantes Participante[]
+  respuestas    Respuesta[]
+  resultados    Resultado[]
+
+  @@index([anfitrionId])
+  @@index([estado])
+  @@index([cuestionarioId])
+}
+
+model Participante {
+  id             String      @id @default(uuid())
+  sesionId       String
+  sesion         SesionJuego @relation(fields: [sesionId], references: [id], onDelete: Restrict)
+  perfilId       String
+  nombre         String
+  conectado      Boolean     @default(true)
+  puntaje        Int         @default(0)
+  aciertos       Int         @default(0)
+  incorporadoEn  DateTime    @default(now()) @db.Timestamptz(3)
+
+  respuestas Respuesta[]
+  resultado  Resultado?
+
+  @@unique([sesionId, perfilId])
+  @@index([perfilId])
+}
+
+model Respuesta {
+  id             String       @id @default(uuid())
+  sesionId       String
+  sesion         SesionJuego  @relation(fields: [sesionId], references: [id], onDelete: Restrict)
+  participanteId String
+  participante   Participante @relation(fields: [participanteId], references: [id], onDelete: Restrict)
+  preguntaId     String
+  pregunta       Pregunta     @relation(fields: [preguntaId], references: [id], onDelete: Restrict)
+  opcionId       String?
+  opcion         Opcion?      @relation(fields: [opcionId], references: [id], onDelete: Restrict)
+  /// Verdadero o falso cuando la respuesta no elige una opción por id.
+  valor          Boolean?
+  aceptada       Boolean      @default(true)
+  tardia         Boolean      @default(false)
+  puntos         Int          @default(0)
+  respondidaEn   DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@unique([participanteId, preguntaId])
+  @@index([sesionId])
+  @@index([preguntaId])
+}
+
+model Resultado {
+  id             String       @id @default(uuid())
+  sesionId       String
+  sesion         SesionJuego  @relation(fields: [sesionId], references: [id], onDelete: Restrict)
+  participanteId String       @unique
+  participante   Participante @relation(fields: [participanteId], references: [id], onDelete: Restrict)
+  puntuacion     Int
+  aciertos       Int
+  incorrectas    Int
+  finalizadoEn   DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@unique([sesionId, participanteId])
+  @@index([sesionId])
+}
