@@ -2,7 +2,7 @@
 
 Plataforma universitaria de cuestionarios interactivos de verdadero o falso.
 
-La aplicación del frontend está en `frontend/`. Los demás módulos del equipo pueden vivir en sus propias carpetas, junto a este directorio.
+La aplicación del frontend está en `frontend/`. La API de actividades está en `actividades/`. Los demás módulos del equipo pueden vivir en sus propias carpetas, junto a estos directorios.
 
 ```bash
 cd frontend
