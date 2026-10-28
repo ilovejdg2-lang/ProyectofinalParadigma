@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { AvisoSesiones, AvisoSesionesLocal } from './aviso-sesiones';
+import { AvisoSesiones } from './aviso-sesiones';
+import { AvisoSesionesCanal, CanalWebSocketService } from './canal-websocket.service';
 import { SesionesJuegoController } from './sesiones-juego.controller';
 import { SesionesJuegoService } from './sesiones-juego.service';
 
@@ -7,8 +8,13 @@ import { SesionesJuegoService } from './sesiones-juego.service';
   controllers: [SesionesJuegoController],
   providers: [
     SesionesJuegoService,
-    { provide: AvisoSesiones, useClass: AvisoSesionesLocal },
+    CanalWebSocketService,
+    AvisoSesionesCanal,
+    {
+      provide: AvisoSesiones,
+      useExisting: AvisoSesionesCanal,
+    },
   ],
-  exports: [SesionesJuegoService, AvisoSesiones],
+  exports: [SesionesJuegoService, AvisoSesiones, CanalWebSocketService],
 })
 export class SesionesJuegoModule {}
