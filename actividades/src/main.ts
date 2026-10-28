@@ -20,4 +20,7 @@ async function bootstrap() {
     'Bootstrap',
   );
 }
-void bootstrap();
+
+bootstrap().catch((err) => {
+  console.error('Error starting actividades:', err);
+});
