@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Institution {
+  id        String              @id @default(uuid())
+  name      String
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  users     User[]
+  policies  EmailDomainPolicy[]
+}
+
+model EmailDomainPolicy {
+  id                   String       @id @default(uuid())
+  domain               String       @unique
+  institutionId        String?
+  institution          Institution? @relation(fields: [institutionId], references: [id])
+  defaultRole          String       @default("student")
+  autoGrantRole        Boolean      @default(true)
+  requiresVerification Boolean      @default(true)
+  createdAt            DateTime     @default(now())
+}
+
+model User {
+  id                 String                   @id @default(uuid())
+  email              String                   @unique
+  passwordHash       String
+  displayName        String
+  role               String                   @default("student")
+  emailVerified      Boolean                  @default(false)
+  institutionId      String?
+  institution        Institution?             @relation(fields: [institutionId], references: [id])
+  status             String                   @default("Active")
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  refreshTokens      RefreshToken[]
+  verificationTokens EmailVerificationToken[]
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  familyId    String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  replacedBy  String?
+  createdByIp String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}

@@ -14,6 +14,7 @@ export interface ClienteAutenticacion {
   iniciarSesion(correo: string, contrasena: string): Promise<Sesion>
   cerrarSesion(token: string): Promise<void>
   sesionActual(token: string): Promise<Sesion | null>
+  cambiarContrasena(token: string, actual: string, nueva: string): Promise<void>
 }
 
 interface UsuarioGuardado extends Perfil {
@@ -41,6 +42,7 @@ function leer(almacen: Almacen): EstadoAuth {
           nombre: NOMBRE_DEMO,
           correo: CORREO_DEMO,
           contrasena: CONTRASENA_DEMO,
+          rol: 'teacher',
         },
       ],
       sesiones: [],
@@ -59,7 +61,7 @@ function sesionDe(estado: EstadoAuth, token: string): Sesion | null {
   const sesion = estado.sesiones.find((item) => item.token === token)
   const usuario = estado.usuarios.find((item) => item.id === sesion?.perfilId)
   if (!sesion || !usuario) return null
-  return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } }
+  return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol ?? (usuario.correo.endsWith('@una.cr') ? 'teacher' : 'student') } }
 }
 
 export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticacion {
@@ -100,6 +102,19 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
     },
     async sesionActual(token) {
       return sesionDe(leer(almacen), token)
+    },
+    async cambiarContrasena(token, actual, nueva) {
+      const estado = leer(almacen)
+      const sesion = estado.sesiones.find((item) => item.token === token)
+      const usuario = estado.usuarios.find((item) => item.id === sesion?.perfilId)
+      if (!usuario || usuario.contrasena !== actual) {
+        throw new ErrorServicio('validacion', 'La contraseña actual es incorrecta.')
+      }
+      if (nueva.length < 8) {
+        throw new ErrorServicio('validacion', 'La nueva contraseña debe tener al menos 8 caracteres.')
+      }
+      usuario.contrasena = nueva
+      guardar(almacen, estado)
     },
   }
 }
@@ -148,6 +163,20 @@ export function crearAutenticacionHttp(baseUrl: string): ClienteAutenticacion {
       if (respuesta.status === 401) return null
       if (!respuesta.ok) throw new ErrorServicio('conexion', await leerMensaje(respuesta))
       return (await respuesta.json()) as Sesion
+    },
+    async cambiarContrasena(token, actual, nueva) {
+      const respuesta = await fetch(`${raiz}/perfiles/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          contrasenaActual: actual,
+          nuevaContrasena: nueva,
+        }),
+      })
+      if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
     },
   }
 }

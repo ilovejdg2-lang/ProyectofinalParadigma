@@ -23,6 +23,15 @@ export function RutaProtegida() {
   return <Outlet />
 }
 
+export function RutaDocente() {
+  const { perfil, listo } = useAutenticacion()
+  if (!listo) return <EstadoCarga texto="Comprobando permisos…" />
+  if (!perfil) return <Navigate to="/iniciar-sesion" replace />
+  const esDocente = perfil.rol === 'teacher' || perfil.rol === 'admin'
+  if (!esDocente) return <Navigate to="/" replace />
+  return <Outlet />
+}
+
 export function rutasAplicacion() {
   return [
     { path: '/iniciar-sesion', element: <InicioSesion /> },
@@ -37,14 +46,20 @@ export function rutasAplicacion() {
             { index: true, element: <Inicio /> },
             { path: '/descubrir', element: <Descubrir /> },
             { path: '/cuestionarios/:id', element: <DetalleCuestionario /> },
-            { path: '/mis-cuestionarios', element: <MisCuestionarios /> },
-            { path: '/cuestionarios/nuevo', element: <EditorCuestionario /> },
-            { path: '/cuestionarios/:id/editar', element: <EditorCuestionario /> },
             { path: '/unirse', element: <Unirse /> },
-            { path: '/sala/:codigo', element: <SalaAnfitrion /> },
             { path: '/resultados/:codigo', element: <Resultados /> },
             { path: '/historial', element: <Historial /> },
             { path: '/perfil', element: <Perfil /> },
+            {
+              // Rutas exclusivas para docentes y administradores
+              element: <RutaDocente />,
+              children: [
+                { path: '/mis-cuestionarios', element: <MisCuestionarios /> },
+                { path: '/cuestionarios/nuevo', element: <EditorCuestionario /> },
+                { path: '/cuestionarios/:id/editar', element: <EditorCuestionario /> },
+                { path: '/sala/:codigo', element: <SalaAnfitrion /> },
+              ],
+            },
           ],
         },
       ],

@@ -10,6 +10,9 @@ coverage/
 .env
 .env.*
 !.env.example
+*.key
+datos/keys/
+datos/keys-test/
 
 # Sistema y editores
 .DS_Store

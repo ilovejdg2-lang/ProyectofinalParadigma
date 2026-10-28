@@ -1,10 +1,26 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { IdentidadActual } from '../autenticacion/identidad-actual';
 import { IdentidadGuard } from '../autenticacion/identidad.guard';
 import type { IdentidadExterna } from '../autenticacion/identidad-externa';
 import { CrearSesionDto } from './dto/crear-sesion.dto';
 import { ResponderDto } from './dto/responder.dto';
 import { SesionesJuegoService } from './sesiones-juego.service';
+
+function exigirDocente(identidad: IdentidadExterna) {
+  if (identidad.role && identidad.role !== 'teacher' && identidad.role !== 'admin') {
+    throw new ForbiddenException({
+      mensaje: 'Solo los docentes pueden crear salas de juego.',
+    });
+  }
+}
 
 @Controller()
 export class SesionesJuegoController {
@@ -16,6 +32,7 @@ export class SesionesJuegoController {
     @Body() entrada: CrearSesionDto,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
+    exigirDocente(identidad);
     return this.sesiones.crear(entrada.cuestionarioId, identidad);
   }
 
