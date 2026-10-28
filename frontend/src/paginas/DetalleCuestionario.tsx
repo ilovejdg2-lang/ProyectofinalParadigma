@@ -10,7 +10,8 @@ import type { Cuestionario } from '../dominio/tipos.ts'
 export function DetalleCuestionario() {
   const { id = '' } = useParams()
   const { actividades, sala } = useServicios()
-  const { token } = useAutenticacion()
+  const { token, perfil } = useAutenticacion()
+  const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
   const navegar = useNavigate()
   const [cuestionario, setCuestionario] = useState<Cuestionario | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,9 +72,15 @@ export function DetalleCuestionario() {
         {cuestionario.esDemostracion ? <p className="etiqueta-demo">Datos de prueba</p> : null}
         <p>{cuestionario.descripcion || 'Este cuestionario no tiene descripción.'}</p>
         {error ? <p className="error-texto">{error}</p> : null}
-        <button className="conjunto-anfitrion" type="button" onClick={() => void iniciar()} disabled={abriendo}>
-          {abriendo ? 'Abriendo…' : 'Juego anfitrión'}
-        </button>
+        {esDocente ? (
+          <button className="conjunto-anfitrion" type="button" onClick={() => void iniciar()} disabled={abriendo}>
+            {abriendo ? 'Abriendo…' : 'Juego anfitrión'}
+          </button>
+        ) : (
+          <Link className="conjunto-anfitrion" to="/unirse" style={{ textAlign: 'center', textDecoration: 'none' }}>
+            Unirse a partida con código
+          </Link>
+        )}
         <Link className="boton-fantasma" to="/descubrir">
           Volver
         </Link>

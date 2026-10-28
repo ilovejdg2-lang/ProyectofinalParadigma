@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProfeLink - Cliente Adicional de Demostración</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+      --success: #22c55e;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 { color: var(--accent); margin-bottom: 0.5rem; }
+    p.sub { color: var(--muted); margin-bottom: 2rem; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    h2 { font-size: 1.25rem; margin-bottom: 1rem; color: #e2e8f0; }
+    label { display: block; font-size: 0.875rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input {
+      width: 100%;
+      padding: 0.6rem;
+      border-radius: 0.375rem;
+      border: 1px solid var(--border);
+      background: #0f172a;
+      color: #fff;
+      margin-bottom: 1rem;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    button {
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    button.secondary { background: #475569; color: #fff; margin-left: 0.5rem; }
+    pre {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+      padding: 1rem;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      color: #38bdf8;
+      max-height: 250px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .badge.teacher { background: #818cf8; color: #000; }
+    .badge.student { background: #34d399; color: #000; }
+    .live-status { color: var(--success); font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h1>Cliente Adicional de Demostración - ProfeLink</h1>
+  <p class="sub">Cliente externo que consume <code>auth-service</code> y <code>actividades</code> mediante API REST y WebSockets con JWT RS256.</p>
+
+  <div class="card">
+    <h2>1. Configuración de Endpoints</h2>
+    <div class="grid">
+      <div>
+        <label>URL de Auth Service</label>
+        <input type="text" id="authUrl" value="http://localhost:5001">
+      </div>
+      <div>
+        <label>URL de Actividades API</label>
+        <input type="text" id="actividadesUrl" value="http://localhost:5002">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Autenticación (JWT RS256)</h2>
+    <div class="grid">
+      <div>
+        <label>Correo</label>
+        <input type="email" id="email" value="profesor@una.cr">
+      </div>
+      <div>
+        <label>Contraseña</label>
+        <input type="password" id="password" value="Profesor123!">
+      </div>
+    </div>
+    <button onclick="iniciarSesion()">Iniciar Sesión</button>
+    <button class="secondary" onclick="usarEstudianteDemo()">Usar Estudiante Demo</button>
+    <button class="secondary" onclick="refrescarToken()">Rotar Refresh Token</button>
+    <button class="secondary" onclick="cerrarSesion()">Cerrar Sesión</button>
+
+    <div style="margin-top: 1rem;">
+      <p id="perfilInfo" style="margin-bottom: 0.5rem;"></p>
+      <label>Access Token (RS256):</label>
+      <pre id="tokenOutput">Sin autenticar</pre>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Consumo de API Protegida (Actividades)</h2>
+    <div style="margin-bottom: 1rem;">
+      <button onclick="consultarCuestionarios()">GET /cuestionarios (Público)</button>
+      <button class="secondary" onclick="consultarMisCuestionarios()">GET /mis-cuestionarios (Docente)</button>
+      <button class="secondary" onclick="consultarResultados()">GET /resultados (Historial)</button>
+    </div>
+    <label>Respuesta de la API:</label>
+    <pre id="apiOutput">Haz clic en un botón para consultar...</pre>
+  </div>
+
+  <div class="card">
+    <h2>4. Canal en Vivo (WebSocket)</h2>
+    <div class="grid">
+      <div>
+        <label>Código de Sala</label>
+        <input type="text" id="codigoSala" placeholder="Ej. ABCDEF">
+      </div>
+      <div style="display: flex; align-items: flex-end; margin-bottom: 1rem;">
+        <button onclick="conectarCanal()">Conectar a Sala</button>
+        <button class="secondary" onclick="desconectarCanal()">Desconectar</button>
+      </div>
+    </div>
+    <p>Estado del canal: <span id="canalEstado" class="live-status">Desconectado</span></p>
+    <pre id="canalOutput" style="margin-top: 0.5rem;">Eventos en tiempo real aparecerán aquí...</pre>
+  </div>
+
+  <script>
+    let token = '';
+    let refreshToken = '';
+    let socket = null;
+
+    function usarEstudianteDemo() {
+      document.getElementById('email').value = 'estudiante@est.una.ac.cr';
+      document.getElementById('password').value = 'Estudiante123!';
+    }
+
+    async function iniciarSesion() {
+      const authUrl = document.getElementById('authUrl').value.replace(/\/$/, '');
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch(`${authUrl}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.mensaje || 'Error al iniciar sesión');
+
+        token = data.token;
+        refreshToken = data.refreshToken;
+
+        document.getElementById('tokenOutput').textContent = token;
+        document.getElementById('perfilInfo').innerHTML = `
+          <strong>Usuario:</strong> ${data.perfil.nombre} (${data.perfil.correo}) 
+          <span class="badge ${data.perfil.rol}">${data.perfil.rol.toUpperCase()}</span>
+        `;
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function refrescarToken() {
+      if (!refreshToken) return alert('Debes iniciar sesión primero.');
+      const authUrl = document.getElementById('authUrl').value.replace(/\/$/, '');
+      try {
+        const res = await fetch(`${authUrl}/api/v1/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.mensaje || 'Error al refrescar token');
+
+        token = data.token;
+        refreshToken = data.refreshToken;
+        document.getElementById('tokenOutput').textContent = token;
+        alert('Refresh Token rotado exitosamente.');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function cerrarSesion() {
+      token = '';
+      refreshToken = '';
+      document.getElementById('tokenOutput').textContent = 'Sesión cerrada';
+      document.getElementById('perfilInfo').textContent = '';
+    }
+
+    async function consultarCuestionarios() {
+      const actUrl = document.getElementById('actividadesUrl').value.replace(/\/$/, '');
+      const res = await fetch(`${actUrl}/cuestionarios`);
+      const data = await res.json();
+      document.getElementById('apiOutput').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function consultarMisCuestionarios() {
+      if (!token) return alert('Debes iniciar sesión como docente primero.');
+      const actUrl = document.getElementById('actividadesUrl').value.replace(/\/$/, '');
+      const res = await fetch(`${actUrl}/mis-cuestionarios`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      document.getElementById('apiOutput').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function consultarResultados() {
+      if (!token) return alert('Debes iniciar sesión primero.');
+      const actUrl = document.getElementById('actividadesUrl').value.replace(/\/$/, '');
+      const res = await fetch(`${actUrl}/resultados`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      document.getElementById('apiOutput').textContent = JSON.stringify(data, null, 2);
+    }
+
+    function conectarCanal() {
+      const codigo = document.getElementById('codigoSala').value.trim().toUpperCase();
+      if (!codigo) return alert('Ingresa un código de sala.');
+
+      const actUrl = document.getElementById('actividadesUrl').value.replace(/\/$/, '').replace('http', 'ws');
+      const wsUrl = `${actUrl}/canal?codigo=${codigo}${token ? `&access_token=${token}` : ''}`;
+
+      if (socket) socket.close();
+
+      socket = new WebSocket(wsUrl);
+      document.getElementById('canalEstado').textContent = 'Conectando...';
+
+      socket.onopen = () => {
+        document.getElementById('canalEstado').textContent = `Conectado a ${codigo}`;
+      };
+
+      socket.onmessage = (event) => {
+        const pre = document.getElementById('canalOutput');
+        pre.textContent = `${new Date().toLocaleTimeString()} - Evento recibido:\n` + JSON.stringify(JSON.parse(event.data), null, 2);
+      };
+
+      socket.onclose = () => {
+        document.getElementById('canalEstado').textContent = 'Desconectado';
+      };
+
+      socket.onerror = (err) => {
+        document.getElementById('canalEstado').textContent = 'Error de conexión';
+      };
+    }
+
+    function desconectarCanal() {
+      if (socket) socket.close();
+      document.getElementById('canalEstado').textContent = 'Desconectado';
+    }
+  </script>
+</body>
+</html>
