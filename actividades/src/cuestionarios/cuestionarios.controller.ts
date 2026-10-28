@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -19,6 +20,14 @@ import {
   EntradaCuestionarioDto,
   FiltrosCatalogoDto,
 } from './dto/entrada-cuestionario.dto';
+
+function exigirDocente(identidad: IdentidadExterna) {
+  if (identidad.role && identidad.role !== 'teacher' && identidad.role !== 'admin') {
+    throw new ForbiddenException({
+      mensaje: 'Solo los docentes pueden gestionar cuestionarios.',
+    });
+  }
+}
 
 @Controller()
 export class CuestionariosController {
@@ -49,6 +58,7 @@ export class CuestionariosController {
     @Body() entrada: EntradaCuestionarioDto,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
+    exigirDocente(identidad);
     return this.cuestionarios.crear(entrada, identidad);
   }
 
@@ -59,6 +69,7 @@ export class CuestionariosController {
     @Body() entrada: EntradaCuestionarioDto,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
+    exigirDocente(identidad);
     return this.cuestionarios.actualizar(id, entrada, identidad);
   }
 
@@ -69,6 +80,7 @@ export class CuestionariosController {
     @Param('id') id: string,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
+    exigirDocente(identidad);
     return this.cuestionarios.eliminar(id, identidad);
   }
 }

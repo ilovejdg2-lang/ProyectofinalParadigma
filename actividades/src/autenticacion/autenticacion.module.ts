@@ -1,19 +1,18 @@
 import { Global, Module } from '@nestjs/common';
 import { IdentidadGuard } from './identidad.guard';
-import {
-  VerificadorIdentidad,
-  VerificadorIdentidadPendiente,
-} from './verificador-identidad';
+import { VerificadorIdentidad } from './verificador-identidad';
+import { VerificadorIdentidadJwt } from './verificador-identidad-jwt';
 
 @Global()
 @Module({
   providers: [
     IdentidadGuard,
+    VerificadorIdentidadJwt,
     {
       provide: VerificadorIdentidad,
-      useClass: VerificadorIdentidadPendiente,
+      useExisting: VerificadorIdentidadJwt,
     },
   ],
-  exports: [IdentidadGuard, VerificadorIdentidad],
+  exports: [IdentidadGuard, VerificadorIdentidad, VerificadorIdentidadJwt],
 })
 export class AutenticacionModule {}

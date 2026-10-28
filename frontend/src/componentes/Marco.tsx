@@ -41,6 +41,15 @@ export function Marco() {
     else aplicar()
   }
 
+  const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
+  const rolEtiqueta = perfil?.rol === 'admin' ? 'Administrador' : esDocente ? 'Docente' : 'Estudiante'
+  const enlacesCurso = curso.filter((enlace) => {
+    if (!esDocente && (enlace.to === '/mis-cuestionarios' || enlace.to === '/cuestionarios/nuevo')) {
+      return false
+    }
+    return true
+  })
+
   return (
     <div className={`aplicacion${contraida ? ' contraida' : ''}${claro ? ' claro' : ''}`}>
       <header className="cabecera">
@@ -54,6 +63,22 @@ export function Marco() {
           <strong>ProfeLink</strong>
         </div>
         <div className="cabecera-acciones">
+          <span
+            className="insignia-rol"
+            style={{
+              padding: '0.25rem 0.65rem',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              background: esDocente ? 'rgba(56, 189, 248, 0.15)' : 'rgba(52, 211, 153, 0.15)',
+              color: esDocente ? '#38bdf8' : '#34d399',
+              border: `1px solid ${esDocente ? 'rgba(56, 189, 248, 0.4)' : 'rgba(52, 211, 153, 0.4)'}`,
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            {rolEtiqueta}
+          </span>
           <button className="cabecera-icono" type="button" aria-label="Reportar un problema" onClick={() => setReporte(true)}>
             <Icono nombre="depurar" />
           </button>
@@ -72,7 +97,7 @@ export function Marco() {
           </NavLink>
           <div className="curso-textos">
             <strong>Paradigmas de Programación</strong>
-            <small>Mi curso</small>
+            <small>{rolEtiqueta}</small>
           </div>
           <button
             className="curso-contraer"
@@ -85,7 +110,7 @@ export function Marco() {
         </div>
         <nav className="grupo-nav" aria-label="Principal">
           <p>CURSO</p>
-          {curso.map((enlace) => (
+          {enlacesCurso.map((enlace) => (
             <NavLink
               key={enlace.to}
               to={enlace.to}

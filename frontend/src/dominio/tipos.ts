@@ -4,6 +4,7 @@ export interface Perfil {
   id: string
   nombre: string
   correo: string
+  rol?: 'teacher' | 'student' | 'admin' | string
 }
 
 export interface Sesion {
