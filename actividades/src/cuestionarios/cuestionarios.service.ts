@@ -67,7 +67,7 @@ export class CuestionariosService {
     private readonly preguntas: PreguntasService,
     private readonly imagenes: ImagenesService,
     private readonly verificador: VerificadorIdentidad,
-  ) {}
+  ) { }
 
   async listar(filtros: FiltrosCatalogoDto): Promise<CuestionarioPublico[]> {
     const filas = await this.db().cuestionario.findMany({
@@ -86,16 +86,36 @@ export class CuestionariosService {
   ): Promise<CuestionarioPublico> {
     const fila = await this.buscarActivo(id);
     const identidad = await this.identidadOpcional(autorizacion);
-    const completo = identidad?.id === fila.autorId;
+    const completo = Boolean(
+      identidad && esMismoAutor(fila.autorId, identidad.id),
+    );
     return presentar(fila, completo);
   }
 
   async mios(identidad: IdentidadExterna): Promise<CuestionarioPublico[]> {
     const filas = await this.db().cuestionario.findMany({
-      where: { eliminadoEn: null, autorId: identidad.id },
+      where: {
+        eliminadoEn: null,
+        autorId:
+          identidad.id === 'perfil-demo-docente' ? 'perfil-demo' : identidad.id,
+      },
       include: arbol,
       orderBy: [{ actualizadoEn: 'desc' }, { id: 'asc' }],
     });
+    if (identidad.id === 'perfil-demo-docente') {
+      const propias = await this.db().cuestionario.findMany({
+        where: { eliminadoEn: null, autorId: identidad.id },
+        include: arbol,
+        orderBy: [{ actualizadoEn: 'desc' }, { id: 'asc' }],
+      });
+      const vistos = new Set<string>();
+      const combinadas = [...propias, ...filas].filter((f) => {
+        if (vistos.has(f.id)) return false;
+        vistos.add(f.id);
+        return true;
+      });
+      return combinadas.map((fila) => presentar(fila as FilaCuestionario, true));
+    }
     return filas.map((fila) => presentar(fila as FilaCuestionario, true));
   }
 
@@ -133,7 +153,7 @@ export class CuestionariosService {
     identidad: IdentidadExterna,
   ): Promise<CuestionarioPublico> {
     const actual = await this.buscarActivo(id);
-    if (actual.autorId !== identidad.id) {
+    if (!esMismoAutor(actual.autorId, identidad.id)) {
       throw new ForbiddenException({
         mensaje: 'Solo quien creó el cuestionario puede editarlo.',
       });
@@ -165,7 +185,7 @@ export class CuestionariosService {
 
   async eliminar(id: string, identidad: IdentidadExterna): Promise<void> {
     const actual = await this.buscarActivo(id);
-    if (actual.autorId !== identidad.id) {
+    if (!esMismoAutor(actual.autorId, identidad.id)) {
       throw new ForbiddenException({
         mensaje: 'Solo quien creó el cuestionario puede eliminarlo.',
       });
@@ -304,12 +324,12 @@ export class CuestionariosService {
           data: bloqueada
             ? { orden: temporal }
             : {
-                enunciado: pregunta.enunciado,
-                respuestaCorrecta,
-                segundos: pregunta.segundos ?? null,
-                imagenId,
-                orden: temporal,
-              },
+              enunciado: pregunta.enunciado,
+              respuestaCorrecta,
+              segundos: pregunta.segundos ?? null,
+              imagenId,
+              orden: temporal,
+            },
         });
         if (!bloqueada) {
           await this.sincronizarOpciones(tx, actual, pregunta, referencias);
@@ -510,6 +530,17 @@ export class CuestionariosService {
       coincideTexto && coincideCategoria && coincideDificultad && coincideAutor
     );
   }
+}
+
+function esMismoAutor(autorId: string, identidadId: string): boolean {
+  if (autorId === identidadId) return true;
+  if (
+    (autorId === 'perfil-demo' && identidadId === 'perfil-demo-docente') ||
+    (autorId === 'perfil-demo-docente' && identidadId === 'perfil-demo')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function etiquetasDe(entrada: CuestionarioEntrada): string[] {

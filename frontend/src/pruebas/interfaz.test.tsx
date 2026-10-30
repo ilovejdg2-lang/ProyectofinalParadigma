@@ -1,12 +1,18 @@
+import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { ProveedorAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { ProveedorServicios } from '../contexto/ProveedorServicios.tsx'
-import { CONTRASENA_DEMO, CORREO_DEMO } from '../datos/demostracion.ts'
+import {
+  CONTRASENA_DEMO,
+  CORREO_DEMO,
+  MODOS_DEMOSTRACION,
+  cuestionariosDemostracion,
+  preguntasKanbanAcademicas,
+} from '../datos/demostracion.ts'
 import { filtrarCuestionarios } from '../dominio/filtros.ts'
-import { cuestionariosDemostracion } from '../datos/demostracion.ts'
-import { validarImagen } from '../dominio/validacion.ts'
+import { validarEntradaPartida, validarImagen } from '../dominio/validacion.ts'
 import { rutasAplicacion } from '../rutas/Rutas.tsx'
 import { almacenMemoria } from '../servicios/almacen.ts'
 import { crearServicios, type Servicios } from '../servicios/crearServicios.ts'
@@ -68,6 +74,25 @@ describe('cuestionarios', () => {
     expect(resultado.map((item) => item.id)).toEqual(['demo-logico'])
   })
 
+  it('incluye preguntas académicas sobre Kanban y datos de demostración para todos los modos', () => {
+    const cuestionarios = cuestionariosDemostracion()
+    const kanban = filtrarCuestionarios(cuestionarios, {
+      texto: '',
+      categoria: 'Kanban',
+      dificultad: '',
+      autor: '',
+    })
+    expect(kanban.map((item) => item.id)).toEqual([
+      'demo-kanban-fundamentos',
+      'demo-kanban-metricas',
+      'demo-kanban-tablero',
+    ])
+    expect(preguntasKanbanAcademicas().length).toBeGreaterThanOrEqual(15)
+    for (const modo of MODOS_DEMOSTRACION) {
+      expect(cuestionarios.some((c) => c.modo === modo.id)).toBe(true)
+    }
+  })
+
   it('no guarda un cuestionario sin título ni respuesta correcta', async () => {
     const usuario = userEvent.setup()
     const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
@@ -119,5 +144,59 @@ describe('partida y resultados', () => {
     renderEn(`/resultados/${sala.codigo}`, servicios)
     expect(await screen.findByText('Ana Estudiante')).toBeInTheDocument()
     expect(screen.getByText(/1 pts/)).toBeInTheDocument()
+  })
+
+  it('valida resultados guardados, evita duplicados y asocia el progreso al usuario autenticado', async () => {
+    const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
+    const estudiante = await servicios.autenticacion.registrar({
+      nombre: 'Sofía Kanban',
+      correo: 'sofia@kanban.test',
+      contrasena: 'Demo-2026',
+    })
+    const otro = await servicios.autenticacion.registrar({
+      nombre: 'Pedro Otro',
+      correo: 'pedro@kanban.test',
+      contrasena: 'Demo-2026',
+    })
+
+    const cuestionarioKanban = await servicios.actividades.obtener('demo-kanban-fundamentos')
+    expect(() =>
+      validarEntradaPartida(cuestionarioKanban, {
+        cuestionarioId: cuestionarioKanban.id,
+        respuestas: [
+          { preguntaId: 'k1', opcionId: 'k1:verdadero' },
+          { preguntaId: 'k1', opcionId: 'k1:falso' },
+        ],
+      }),
+    ).toThrow(/No se permiten respuestas duplicadas/)
+
+    const guardado = await servicios.sala.guardarPartida(estudiante.token, {
+      codigo: 'KANB99',
+      cuestionarioId: 'demo-kanban-fundamentos',
+      modo: 'practica',
+      respuestas: [
+        { preguntaId: 'k1', opcionId: 'k1:verdadero' },
+        { preguntaId: 'k2', opcionId: 'k2:falso' },
+        { preguntaId: 'k3', valor: true },
+        { preguntaId: 'k4', opcionId: 'k4:falso' },
+        { preguntaId: 'k5', opcionId: 'k5:verdadero' },
+        { preguntaId: 'k6', opcionId: 'k6:verdadero' },
+      ],
+    })
+    expect(guardado.participantes[0]?.puntaje).toBe(6)
+
+    await expect(
+      servicios.sala.guardarPartida(otro.token, {
+        codigo: 'KANB99',
+        cuestionarioId: 'demo-kanban-fundamentos',
+        respuestas: [{ preguntaId: 'k1', opcionId: 'k1:verdadero' }],
+      }),
+    ).rejects.toThrow(/Ya existe una partida registrada/)
+
+    const progreso = await servicios.sala.progreso(estudiante.token)
+    expect(progreso.usuarioId).toBe(estudiante.perfil.id)
+    expect(progreso.partidasJugadas).toBe(1)
+    expect(progreso.totalAciertos).toBe(6)
+    expect(progreso.dominioKanban.porcentajeDominio).toBe(100)
   })
 })

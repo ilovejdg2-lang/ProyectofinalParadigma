@@ -1,5 +1,16 @@
 export type Dificultad = 'facil' | 'medio' | 'dificil'
 
+export type ModoJuego = 'en-vivo' | 'practica' | 'evaluacion' | 'desafio'
+
+export interface DefinicionModo {
+  id: ModoJuego
+  nombre: string
+  descripcion: string
+  segundosPorPregunta: number
+  permiteIndividual: boolean
+  mostrarExplicacionInmediata: boolean
+}
+
 export interface Perfil {
   id: string
   nombre: string
@@ -25,6 +36,12 @@ export interface Pregunta {
   opciones?: OpcionRespuesta[]
   imagenUrl?: string
   orden: number
+  segundos?: number
+  categoria?: string
+  subtema?: string
+  dificultad?: Dificultad
+  explicacion?: string
+  modoRecomendado?: ModoJuego
 }
 
 export interface Cuestionario {
@@ -34,6 +51,7 @@ export interface Cuestionario {
   categoria: string
   etiquetas: string[]
   dificultad: Dificultad
+  modo?: ModoJuego
   autorId: string
   autorNombre: string
   preguntas: Pregunta[]
@@ -93,6 +111,7 @@ export interface Sala {
   codigo: string
   cuestionarioId: string
   titulo: string
+  modo?: ModoJuego
   anfitrionId: string
   anfitrionNombre: string
   estado: EstadoSala
@@ -111,8 +130,49 @@ export interface ResultadoImagen {
 
 export interface ResumenResultado {
   codigo: string
+  cuestionarioId?: string
   titulo: string
+  modo?: ModoJuego
   finalizadaEn: string
   anfitrionId: string
   participantes: Participante[]
+}
+
+export interface EntradaGuardarPartida {
+  codigo?: string
+  cuestionarioId: string
+  modo?: ModoJuego
+  respuestas: Array<{
+    preguntaId: string
+    opcionId?: string
+    valor?: boolean | null
+    tardia?: boolean
+  }>
+  puntuacionReportada?: number
+}
+
+export interface ProgresoCategoria {
+  categoria: string
+  partidasCompletadas: number
+  aciertos: number
+  preguntasRespondidas: number
+  porcentajeDominio: number
+}
+
+export interface ProgresoUsuario {
+  usuarioId: string
+  nombre: string
+  partidasJugadas: number
+  partidasComoAnfitrion: number
+  puntajeTotal: number
+  totalAciertos: number
+  totalIncorrectas: number
+  totalPreguntasRespondidas: number
+  promedioPorcentaje: number
+  mejorPuntaje: number
+  modosJugados: ModoJuego[]
+  cuestionariosCompletados: string[]
+  dominioKanban: ProgresoCategoria
+  progresoPorCategoria: ProgresoCategoria[]
+  actualizadoEn: string
 }

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#10233f"/>
+  <g fill="#17345b" stroke="#4b90ff" stroke-width="2">
+    <rect x="48" y="64" width="160" height="248" rx="12"/>
+    <rect x="240" y="64" width="160" height="248" rx="12"/>
+    <rect x="432" y="64" width="160" height="248" rx="12"/>
+  </g>
+  <rect x="68" y="96" width="120" height="44" rx="8" fill="#2f7cf6"/>
+  <rect x="68" y="156" width="120" height="44" rx="8" fill="#4b90ff"/>
+  <rect x="260" y="96" width="120" height="44" rx="8" fill="#f59e0b"/>
+  <rect x="452" y="96" width="120" height="44" rx="8" fill="#10b981"/>
+  <rect x="452" y="156" width="120" height="44" rx="8" fill="#10b981"/>
+  <text x="48" y="44" fill="#d6e6ff" font-family="Segoe UI, sans-serif" font-size="24">KANBAN · WIP</text>
+</svg>
+

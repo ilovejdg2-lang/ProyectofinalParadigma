@@ -1,16 +1,19 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { AlmacenPersistenciaLocal } from './almacen-persistencia';
 
 export type EstadoBaseDatos = 'no-configurada' | 'disponible' | 'no-disponible';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private cliente: PrismaClient | null = null;
+  private respaldoLocal: AlmacenPersistenciaLocal =
+    new AlmacenPersistenciaLocal();
   private motivo: EstadoBaseDatos = 'no-configurada';
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(@Optional() private readonly config?: ConfigService) {}
 
   async onModuleInit(): Promise<void> {
     await this.conectar();
@@ -26,19 +29,19 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   estaListo(): boolean {
-    return this.cliente !== null;
+    return this.cliente !== null || this.respaldoLocal !== null;
   }
 
   obtener(): PrismaClient {
-    if (!this.cliente) {
-      throw new Error('PostgreSQL no está disponible.');
+    if (this.cliente) {
+      return this.cliente;
     }
-    return this.cliente;
+    return this.respaldoLocal as unknown as PrismaClient;
   }
 
   private async conectar(): Promise<void> {
-    const conexion = this.config.get<string>('DIRECT_URL')?.trim();
-    if (!conexion) {
+    const conexion = this.config?.get<string>('DIRECT_URL')?.trim();
+    if (!conexion || conexion.includes('PROJECT_REF')) {
       this.motivo = 'no-configurada';
       return;
     }

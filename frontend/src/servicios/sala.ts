@@ -1,6 +1,21 @@
+import { resultadosDemostracion } from '../datos/demostracion.ts'
 import { ErrorServicio } from '../dominio/errores.ts'
 import { opcionesDe } from '../dominio/opciones.ts'
-import type { Participante, Pregunta, RespuestaParticipante, ResumenResultado, Sala } from '../dominio/tipos.ts'
+import type {
+  EntradaGuardarPartida,
+  Participante,
+  Pregunta,
+  ProgresoUsuario,
+  RespuestaParticipante,
+  ResumenResultado,
+  Sala,
+} from '../dominio/tipos.ts'
+import {
+  calcularProgresoLocal,
+  deduplicarResultados,
+  normalizarYValidarResultado,
+  validarEntradaPartida,
+} from '../dominio/validacion.ts'
 import type { ClienteActividades } from './actividades.ts'
 import type { ClienteAutenticacion } from './autenticacion.ts'
 import type { Almacen } from './almacen.ts'
@@ -17,7 +32,9 @@ export interface ClienteSala {
   responder(token: string, codigo: string, valor: boolean | string): Promise<Sala>
   cerrarPregunta(token: string, codigo: string): Promise<Sala>
   avanzar(token: string, codigo: string): Promise<Sala>
+  guardarPartida(token: string, entrada: EntradaGuardarPartida): Promise<ResumenResultado>
   historial(token: string): Promise<ResumenResultado[]>
+  progreso(token: string): Promise<ProgresoUsuario>
   obtenerResultado(token: string, codigo: string): Promise<ResumenResultado>
   estadoConexion(): EstadoConexion
   desconectar(): void
@@ -45,8 +62,25 @@ function guardarSalas(almacen: Almacen, estado: EstadoSalas) {
 
 function leerResultados(almacen: Almacen): ResumenResultado[] {
   const texto = almacen.leer(CLAVE_RESULTADOS)
-  if (!texto) return []
-  return JSON.parse(texto) as ResumenResultado[]
+  const iniciales = resultadosDemostracion()
+  if (!texto) {
+    const validos = deduplicarResultados(iniciales)
+    almacen.escribir(CLAVE_RESULTADOS, JSON.stringify(validos))
+    return validos
+  }
+  const guardados = JSON.parse(texto) as ResumenResultado[]
+  const faltantes = iniciales.filter(
+    (demo) => !guardados.some((actual) => actual.codigo === demo.codigo),
+  )
+  const combinados = deduplicarResultados([...guardados, ...faltantes])
+  if (faltantes.length > 0) {
+    almacen.escribir(CLAVE_RESULTADOS, JSON.stringify(combinados))
+  }
+  return combinados
+}
+
+function guardarResultados(almacen: Almacen, lista: ResumenResultado[]) {
+  almacen.escribir(CLAVE_RESULTADOS, JSON.stringify(deduplicarResultados(lista)))
 }
 
 function notificar(almacen: Almacen, codigo: string, sala: Sala) {
@@ -57,12 +91,15 @@ function notificar(almacen: Almacen, codigo: string, sala: Sala) {
   canal.close()
 }
 
-function codigoNuevo(salas: Record<string, Sala>): string {
+function codigoNuevo(salas: Record<string, Sala>, existentes?: ResumenResultado[]): string {
   const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const codigosUsados = new Set(
+    existentes?.map((r) => r.codigo.toUpperCase()) ?? [],
+  )
   let codigo = ''
   do {
     codigo = Array.from({ length: 6 }, () => alfabeto[Math.floor(Math.random() * alfabeto.length)]).join('')
-  } while (salas[codigo])
+  } while (salas[codigo] || codigosUsados.has(codigo))
   return codigo
 }
 
@@ -127,11 +164,12 @@ export function crearSalaSimulada(
         throw new ErrorServicio('validacion', 'El cuestionario no tiene preguntas.')
       }
       const estado = leerSalas(almacen)
-      const codigo = codigoNuevo(estado.salas)
+      const codigo = codigoNuevo(estado.salas, leerResultados(almacen))
       const sala: Sala = {
         codigo,
         cuestionarioId,
         titulo: cuestionario.titulo,
+        modo: cuestionario.modo ?? 'en-vivo',
         anfitrionId: perfil.id,
         anfitrionNombre: perfil.nombre,
         estado: 'esperando',
@@ -307,16 +345,18 @@ export function crearSalaSimulada(
       }
       if (sala.preguntaActual + 1 >= sala.preguntas.length) {
         sala.estado = 'finalizada'
-        const resumen: ResumenResultado = {
+        const resumen: ResumenResultado = normalizarYValidarResultado({
           codigo: sala.codigo,
+          cuestionarioId: sala.cuestionarioId,
           titulo: sala.titulo,
+          modo: sala.modo ?? 'en-vivo',
           finalizadaEn: new Date().toISOString(),
           anfitrionId: sala.anfitrionId,
           participantes: sala.participantes.map((item) => ({ ...item, respuestas: [...item.respuestas] })),
-        }
+        })
         const resultados = leerResultados(almacen).filter((item) => item.codigo !== sala.codigo)
         resultados.unshift(resumen)
-        almacen.escribir(CLAVE_RESULTADOS, JSON.stringify(resultados))
+        guardarResultados(almacen, resultados)
       } else {
         sala.preguntaActual += 1
         sala.estado = 'pregunta'
@@ -326,21 +366,89 @@ export function crearSalaSimulada(
       publicar(sala.codigo, sala)
       return sala
     },
+    async guardarPartida(token, entrada) {
+      exigirConexion()
+      const perfil = await exigirPerfil(autenticacion, token)
+      const cuestionario = await actividades.obtener(entrada.cuestionarioId)
+      const existentes = leerResultados(almacen)
+      const codigoSolicitado = entrada.codigo?.trim().toUpperCase().slice(0, 6)
+      if (codigoSolicitado) {
+        const previo = existentes.find((item) => item.codigo === codigoSolicitado)
+        if (previo) {
+          const pertenece =
+            previo.anfitrionId === perfil.id ||
+            previo.participantes.some((p) => p.perfilId === perfil.id)
+          if (!pertenece) {
+            throw new ErrorServicio('estado', 'Ya existe una partida registrada con ese código.')
+          }
+          return normalizarYValidarResultado(previo)
+        }
+      }
+
+      let validado: ReturnType<typeof validarEntradaPartida>
+      try {
+        validado = validarEntradaPartida(cuestionario, entrada)
+      } catch (err) {
+        throw new ErrorServicio('validacion', err instanceof Error ? err.message : 'Resultados inválidos.')
+      }
+
+      const estado = leerSalas(almacen)
+      const codigo =
+        codigoSolicitado && /^[A-Z0-9]{6}$/.test(codigoSolicitado)
+          ? codigoSolicitado
+          : codigoNuevo(estado.salas, existentes)
+
+      const resumen: ResumenResultado = normalizarYValidarResultado({
+        codigo,
+        cuestionarioId: cuestionario.id,
+        titulo: cuestionario.titulo,
+        modo: entrada.modo ?? cuestionario.modo ?? 'practica',
+        finalizadaEn: new Date().toISOString(),
+        anfitrionId: perfil.id,
+        participantes: [
+          {
+            id: crypto.randomUUID(),
+            perfilId: perfil.id,
+            nombre: perfil.nombre,
+            conectado: true,
+            puntaje: validado.puntaje,
+            aciertos: validado.aciertos,
+            respuestas: validado.respuestas,
+          },
+        ],
+      })
+
+      existentes.unshift(resumen)
+      guardarResultados(almacen, existentes)
+      return resumen
+    },
     async historial(token) {
       exigirConexion()
       const perfil = await exigirPerfil(autenticacion, token)
-      return leerResultados(almacen).filter(
-        (resultado) =>
-          resultado.anfitrionId === perfil.id ||
-          resultado.participantes.some((participante) => participante.perfilId === perfil.id),
+      const idsEquivalentes = new Set(
+        perfil.id === 'perfil-demo' || perfil.id === 'perfil-demo-docente'
+          ? ['perfil-demo', 'perfil-demo-docente']
+          : [perfil.id],
       )
+      return deduplicarResultados(leerResultados(almacen)).filter(
+        (resultado) =>
+          idsEquivalentes.has(resultado.anfitrionId) ||
+          resultado.participantes.some((participante) => idsEquivalentes.has(participante.perfilId)),
+      )
+    },
+    async progreso(token) {
+      exigirConexion()
+      const perfil = await exigirPerfil(autenticacion, token)
+      const resultados = leerResultados(almacen)
+      const cuestionarios = await actividades.listar()
+      return calcularProgresoLocal(perfil.id, perfil.nombre, resultados, cuestionarios)
     },
     async obtenerResultado(token, codigo) {
       exigirConexion()
       await exigirPerfil(autenticacion, token)
       const resultado = leerResultados(almacen).find((item) => item.codigo === codigo.toUpperCase())
       if (!resultado) throw new ErrorServicio('no-encontrado', 'Esta sesión todavía no tiene resultados guardados.')
-      return resultado
+      return normalizarYValidarResultado(resultado)
     },
   }
 }
@@ -398,16 +506,35 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
       }),
     cerrarPregunta: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/cerrar`, 'POST', {}),
     avanzar: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/avanzar`, 'POST', {}),
+    async guardarPartida(token, entrada) {
+      const respuesta = await fetch(`${raiz}/resultados/partidas`, {
+        method: 'POST',
+        headers: autorizacion(token),
+        body: JSON.stringify(entrada),
+      })
+      if (respuesta.status === 400) throw new ErrorServicio('validacion', await mensaje(respuesta))
+      if (respuesta.status === 404) throw new ErrorServicio('no-encontrado', await mensaje(respuesta))
+      if (respuesta.status === 409) throw new ErrorServicio('estado', await mensaje(respuesta))
+      if (!respuesta.ok) throw new ErrorServicio('conexion', await mensaje(respuesta))
+      return normalizarYValidarResultado((await respuesta.json()) as ResumenResultado)
+    },
     async historial(token) {
       const respuesta = await fetch(`${raiz}/resultados`, { headers: { Authorization: `Bearer ${token}` } })
       if (!respuesta.ok) throw new ErrorServicio('conexion', await mensaje(respuesta))
-      return (await respuesta.json()) as ResumenResultado[]
+      return deduplicarResultados((await respuesta.json()) as ResumenResultado[])
+    },
+    async progreso(token) {
+      const respuesta = await fetch(`${raiz}/resultados/progreso`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!respuesta.ok) throw new ErrorServicio('conexion', await mensaje(respuesta))
+      return (await respuesta.json()) as ProgresoUsuario
     },
     async obtenerResultado(token, codigo) {
       const respuesta = await fetch(`${raiz}/resultados/${codigo}`, { headers: { Authorization: `Bearer ${token}` } })
       if (respuesta.status === 404) throw new ErrorServicio('no-encontrado', 'Esta sesión todavía no tiene resultados guardados.')
       if (!respuesta.ok) throw new ErrorServicio('conexion', await mensaje(respuesta))
-      return (await respuesta.json()) as ResumenResultado
+      return normalizarYValidarResultado((await respuesta.json()) as ResumenResultado)
     },
     suscribir(codigo, alCambiar) {
       if (typeof WebSocket === 'undefined' || !canalUrl) return () => undefined
