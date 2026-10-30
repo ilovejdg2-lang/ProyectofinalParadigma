@@ -44,6 +44,13 @@ function leer(almacen: Almacen): EstadoAuth {
           contrasena: CONTRASENA_DEMO,
           rol: 'teacher',
         },
+        {
+          id: 'perfil-fatima-una',
+          nombre: 'Fátima Carrillo García',
+          correo: 'fatima.carrillo.garcia@est.una.ac.cr',
+          contrasena: 'F1T3M12107',
+          rol: 'student',
+        },
       ],
       sesiones: [],
     }
@@ -121,8 +128,9 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
 
 async function leerMensaje(respuesta: Response): Promise<string> {
   try {
-    const cuerpo = (await respuesta.json()) as { mensaje?: string }
-    return cuerpo.mensaje ?? 'El servicio de autenticación rechazó la solicitud.'
+    const cuerpo = (await respuesta.json()) as { mensaje?: string; message?: string | string[] }
+    const texto = Array.isArray(cuerpo.message) ? cuerpo.message[0] : cuerpo.message
+    return cuerpo.mensaje ?? texto ?? 'El servicio de autenticación rechazó la solicitud.'
   } catch {
     return 'El servicio de autenticación no respondió correctamente.'
   }

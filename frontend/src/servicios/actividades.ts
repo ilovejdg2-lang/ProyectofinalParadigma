@@ -12,6 +12,7 @@ export interface EntradaCuestionario {
   categoria: string
   etiquetas: string[]
   dificultad: Cuestionario['dificultad']
+  modo?: Cuestionario['modo']
   imagenUrl?: string
   preguntas: Pregunta[]
 }
@@ -27,18 +28,38 @@ export interface ClienteActividades {
 
 const CLAVE = 'profelink.cuestionarios.v1'
 
+function deduplicarCuestionarios(lista: Cuestionario[]): Cuestionario[] {
+  const vistos = new Set<string>()
+  const resultado: Cuestionario[] = []
+  for (const item of lista) {
+    if (!item?.id || vistos.has(item.id)) continue
+    vistos.add(item.id)
+    resultado.push(item)
+  }
+  return resultado
+}
+
 function leer(almacen: Almacen): Cuestionario[] {
   const texto = almacen.leer(CLAVE)
+  const iniciales = cuestionariosDemostracion()
   if (!texto) {
-    const iniciales = cuestionariosDemostracion()
     almacen.escribir(CLAVE, JSON.stringify(iniciales))
     return iniciales
   }
-  return JSON.parse(texto) as Cuestionario[]
+  const guardados = JSON.parse(texto) as Cuestionario[]
+  const faltantesDemo = iniciales.filter(
+    (demo) => !guardados.some((actual) => actual.id === demo.id),
+  )
+  if (faltantesDemo.length > 0) {
+    const combinados = deduplicarCuestionarios([...guardados, ...faltantesDemo])
+    almacen.escribir(CLAVE, JSON.stringify(combinados))
+    return combinados
+  }
+  return deduplicarCuestionarios(guardados)
 }
 
 function guardarLista(almacen: Almacen, lista: Cuestionario[]) {
-  almacen.escribir(CLAVE, JSON.stringify(lista))
+  almacen.escribir(CLAVE, JSON.stringify(deduplicarCuestionarios(lista)))
 }
 
 async function perfilDe(autenticacion: ClienteAutenticacion, token: string) {
@@ -82,6 +103,7 @@ export function crearActividadesSimuladas(
           categoria: entrada.categoria,
           etiquetas: entrada.etiquetas,
           dificultad: entrada.dificultad,
+          modo: entrada.modo ?? actual.modo ?? 'en-vivo',
           imagenUrl: entrada.imagenUrl,
           preguntas: entrada.preguntas,
           actualizadoEn: ahora,
@@ -101,6 +123,7 @@ export function crearActividadesSimuladas(
         categoria: entrada.categoria,
         etiquetas: entrada.etiquetas,
         dificultad: entrada.dificultad,
+        modo: entrada.modo ?? 'en-vivo',
         autorId: perfil.id,
         autorNombre: perfil.nombre,
         imagenUrl: entrada.imagenUrl,
@@ -193,7 +216,10 @@ export function crearActividadesHttp(baseUrl: string): ClienteActividades {
       return (await respuesta.json()) as Cuestionario[]
     },
     async obtener(id) {
-      const respuesta = await fetch(`${raiz}/cuestionarios/${id}`)
+      const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('profelink.token') : null
+      const respuesta = await fetch(`${raiz}/cuestionarios/${id}`, {
+        headers: token ? autorizacion(token) : undefined,
+      })
       if (respuesta.status === 404) throw new ErrorServicio('no-encontrado', 'No se encontró el cuestionario.')
       if (!respuesta.ok) throw new ErrorServicio('conexion', await mensaje(respuesta))
       return (await respuesta.json()) as Cuestionario
@@ -205,10 +231,11 @@ export function crearActividadesHttp(baseUrl: string): ClienteActividades {
     },
     async guardar(token, entrada) {
       const esEdicion = Boolean(entrada.id)
+      const { modo: _modo, id: _id, ...cuerpo } = entrada
       const respuesta = await fetch(esEdicion ? `${raiz}/cuestionarios/${entrada.id}` : `${raiz}/cuestionarios`, {
         method: esEdicion ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', ...autorizacion(token) },
-        body: JSON.stringify(entrada),
+        body: JSON.stringify(cuerpo),
       })
       if (respuesta.status === 403) throw new ErrorServicio('permiso', await mensaje(respuesta))
       if (!respuesta.ok) throw new ErrorServicio('validacion', await mensaje(respuesta))

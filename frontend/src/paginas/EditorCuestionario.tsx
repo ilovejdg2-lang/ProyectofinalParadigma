@@ -7,7 +7,7 @@ import { mensajeDe } from '../dominio/errores.ts'
 import type { BorradorCuestionario, BorradorPregunta, Dificultad } from '../dominio/tipos.ts'
 import { validarCuestionario } from '../dominio/validacion.ts'
 
-const categorias = ['Paradigma funcional', 'Paradigma lógico', 'Orientado a objetos', 'Concurrente', 'General']
+const categorias = ['Kanban', 'Paradigma funcional', 'Paradigma lógico', 'Orientado a objetos', 'Concurrente', 'General']
 
 function preguntaVacia(): BorradorPregunta {
   return {

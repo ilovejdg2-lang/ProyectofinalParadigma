@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AutenticacionModule } from './autenticacion/autenticacion.module';
+import { BancoPreguntasModule } from './banco-preguntas/banco-preguntas.module';
 import { FiltroErrores } from './comun/filtro-errores';
 import { tuboValidacion } from './comun/tubo-validacion';
 import { CuestionariosModule } from './cuestionarios/cuestionarios.module';
@@ -17,6 +18,7 @@ import { SesionesJuegoModule } from './sesiones-juego/sesiones-juego.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AutenticacionModule,
+    BancoPreguntasModule,
     CuestionariosModule,
     PreguntasModule,
     ImagenesModule,
