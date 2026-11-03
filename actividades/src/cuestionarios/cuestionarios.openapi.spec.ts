@@ -79,8 +79,24 @@ describe('OpenAPI de cuestionarios', () => {
       properties: {
         titulo: { minLength: 3, maxLength: 80 },
         descripcion: { maxLength: 400 },
+        categoria: { type: 'string', maxLength: 80 },
       },
+      required: expect.arrayContaining(['titulo', 'descripcion', 'categoria']),
     });
+    expect(document.components?.schemas?.PreguntaDto?.properties).toHaveProperty(
+      'enunciado',
+      expect.objectContaining({ type: 'string' }),
+    );
+    expect(document.components?.schemas?.PreguntaDto?.required).toContain(
+      'enunciado',
+    );
+    expect(document.components?.schemas?.OpcionDto?.properties).toHaveProperty(
+      'texto',
+      expect.objectContaining({ type: 'string' }),
+    );
+    expect(document.components?.schemas?.OpcionDto?.required).toContain(
+      'texto',
+    );
     expect(
       document.components?.schemas?.EntradaCuestionarioDto?.properties?.id,
     ).not.toHaveProperty('minLength');

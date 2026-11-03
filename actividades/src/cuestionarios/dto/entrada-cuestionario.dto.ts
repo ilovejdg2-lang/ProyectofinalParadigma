@@ -22,6 +22,7 @@ export class OpcionDto {
   @IsString()
   id?: string;
 
+  @ApiProperty({ description: 'Texto de la opción de respuesta.' })
   @IsString()
   @IsNotEmpty({ message: 'Hay una respuesta vacía.' })
   texto!: string;
@@ -38,6 +39,7 @@ export class PreguntaDto {
   @IsString()
   id?: string;
 
+  @ApiProperty({ description: 'Enunciado de la pregunta.' })
   @IsString()
   @IsNotEmpty({ message: 'Hay una pregunta sin enunciado.' })
   enunciado!: string;
@@ -89,6 +91,7 @@ export class EntradaCuestionarioDto {
   })
   descripcion!: string;
 
+  @ApiProperty({ maxLength: 80, description: 'Categoría del cuestionario.' })
   @IsString()
   @IsNotEmpty({ message: 'Elige una categoría.' })
   @MaxLength(80, { message: 'La categoría admite como máximo 80 caracteres.' })

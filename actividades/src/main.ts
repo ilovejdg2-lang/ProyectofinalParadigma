@@ -1,3 +1,4 @@
+import { shutdownTelemetry } from './instrumentation.js';
 import type { Server } from 'node:http';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -5,7 +6,6 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
-import { shutdownTelemetry } from './instrumentation.js';
 import { createOpenApiConfig } from './openapi/openapi.config';
 
 async function bootstrap() {
