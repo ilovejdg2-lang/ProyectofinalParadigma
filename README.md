@@ -68,9 +68,13 @@ Abre `cliente-adicional/index.html` en el navegador para probar el login, la rot
 
 ## 3. Despliegue con Docker Compose
 
+El siguiente comando inicia la configuración local de desarrollo:
+
 ```bash
 docker compose up --build
 ```
+
+La configuración preparada para el Droplet de DigitalOcean, Caddy, HTTPS y los subdominios se documenta en [Preparación del despliegue en DigitalOcean](docs/despliegue-digitalocean.md). Esa guía no implica que el proyecto ya esté publicado.
 
 ---
 

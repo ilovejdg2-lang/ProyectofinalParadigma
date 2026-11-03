@@ -1,0 +1,32 @@
+services:
+  auth-service:
+    ports: !override
+      - "127.0.0.1:5001:5001"
+    environment:
+      FRONTEND_URL: ${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN in .env.production}
+      JWT_ISSUER: ${AUTH_PUBLIC_URL:?Set AUTH_PUBLIC_URL in .env.production}
+
+  actividades:
+    ports: !override
+      - "127.0.0.1:5002:5002"
+    environment:
+      FRONTEND_URL: ${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN in .env.production}
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_AUTH_URL: ${AUTH_PUBLIC_URL:?Set AUTH_PUBLIC_URL in .env.production}
+        VITE_ACTIVIDADES_URL: ${ACTIVIDADES_PUBLIC_URL:?Set ACTIVIDADES_PUBLIC_URL in .env.production}
+        VITE_CANAL_URL: ${CANAL_PUBLIC_URL:?Set CANAL_PUBLIC_URL in .env.production}
+        VITE_USAR_SIMULACION: "false"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

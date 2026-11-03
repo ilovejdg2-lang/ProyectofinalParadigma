@@ -1,0 +1,14 @@
+profelink.sinkro.dev {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:5173
+}
+
+auth.profelink.sinkro.dev {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:5001
+}
+
+api.profelink.sinkro.dev {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:5002
+}

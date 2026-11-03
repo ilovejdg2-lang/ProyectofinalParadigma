@@ -1,0 +1,21 @@
+services:
+  actividades:
+    environment:
+      NODE_OPTIONS: --require=./dist/instrumentation.js
+      OTEL_SERVICE_NAME: actividades
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+    depends_on:
+      otel-lgtm:
+        condition: service_started
+
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.39.0
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - otel-lgtm-data:/data
+
+volumes:
+  otel-lgtm-data:
