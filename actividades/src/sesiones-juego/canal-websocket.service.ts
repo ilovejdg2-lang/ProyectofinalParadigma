@@ -4,7 +4,7 @@ import {
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { HttpAdapterHost } from '@nestjs/core';
+import { HttpAdapterHost, ModuleRef } from '@nestjs/core';
 import { IncomingMessage } from 'node:http';
 import { Socket } from 'node:net';
 import { URL } from 'node:url';
@@ -28,14 +28,18 @@ export class CanalWebSocketService
   private readonly logger = new Logger(CanalWebSocketService.name);
   private wss: WebSocketServer | null = null;
   private salas = new Map<string, Set<ClienteConectado>>();
+  private sesiones!: SesionesJuegoService;
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
     private readonly verificador: VerificadorIdentidad,
-    private readonly sesiones: SesionesJuegoService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   onApplicationBootstrap() {
+    this.sesiones = this.moduleRef.get(SesionesJuegoService, {
+      strict: false,
+    });
     const server = this.adapterHost.httpAdapter.getHttpServer();
     if (!server) {
       this.logger.warn('No se pudo obtener el servidor HTTP para WebSocket.');
@@ -192,8 +196,6 @@ export class CanalWebSocketService
     }
   }
 }
-
-import { ModuleRef } from '@nestjs/core';
 
 @Injectable()
 export class AvisoSesionesCanal extends AvisoSesiones {

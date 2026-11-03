@@ -1,6 +1,6 @@
 import { createServer, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { HttpAdapterHost } from '@nestjs/core';
+import { HttpAdapterHost, ModuleRef } from '@nestjs/core';
 import WebSocket from 'ws';
 import { VerificadorIdentidad } from '../autenticacion/verificador-identidad';
 import { CanalWebSocketService } from './canal-websocket.service';
@@ -31,7 +31,10 @@ describe('CanalWebSocketService access control', () => {
           identity.id === 'host' || identity.id === 'member',
       ),
     } as unknown as SesionesJuegoService;
-    service = new CanalWebSocketService(adapterHost, verifier, sessions);
+    const moduleRef = {
+      get: jest.fn(() => sessions),
+    } as unknown as ModuleRef;
+    service = new CanalWebSocketService(adapterHost, verifier, moduleRef);
     service.onApplicationBootstrap();
     await new Promise<void>((resolve) =>
       server.listen(0, '127.0.0.1', resolve),
