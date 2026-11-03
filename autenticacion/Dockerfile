@@ -9,10 +9,12 @@ COPY prisma.config.ts ./
 COPY prisma ./prisma/
 
 RUN npm ci
-RUN npx prisma generate
 
 COPY src ./src
+RUN npx prisma generate
 RUN npm run build
+
+RUN npm prune --omit=dev --ignore-scripts
 
 # Etapa de Producción
 FROM node:22-alpine AS runner
@@ -22,16 +24,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5001
 
-COPY package*.json ./
-COPY prisma.config.ts ./
-COPY prisma ./prisma/
-
-RUN npm ci --omit=dev
-RUN npx prisma generate
-
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
 # Usuario no-root para seguridad
+RUN mkdir -p /app/datos/keys && chown node:node /app/datos/keys
 USER node
 
 EXPOSE 5001
