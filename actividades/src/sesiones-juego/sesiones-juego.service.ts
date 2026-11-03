@@ -103,6 +103,23 @@ export class SesionesJuegoService {
     return presentarSala(fila, identidad.id);
   }
 
+  async autorizarCanal(
+    codigo: string,
+    identidad: IdentidadExterna,
+  ): Promise<boolean> {
+    let fila: FilaSesion;
+    try {
+      fila = await this.buscar(codigo);
+    } catch (error) {
+      if (error instanceof NotFoundException) return false;
+      throw error;
+    }
+    return (
+      fila.anfitrionId === identidad.id ||
+      fila.participantes.some((item) => item.perfilId === identidad.id)
+    );
+  }
+
   async unirse(
     codigo: string,
     identidad: IdentidadExterna,

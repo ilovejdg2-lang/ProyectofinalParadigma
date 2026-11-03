@@ -38,6 +38,25 @@ async function rechazo(operacion: Promise<unknown>) {
 }
 
 describe('SesionesJuegoService', () => {
+  it('autoriza el canal solo al anfitrión y a participantes registrados', async () => {
+    const { servicio } = armar();
+    const sala = await servicio.crear('quiz-1', ana);
+    await servicio.unirse(sala.codigo, luis);
+
+    await expect(servicio.autorizarCanal(sala.codigo, ana)).resolves.toBe(true);
+    await expect(servicio.autorizarCanal(sala.codigo, luis)).resolves.toBe(
+      true,
+    );
+    await expect(
+      servicio.autorizarCanal(sala.codigo, { id: 'nora', nombre: 'Nora' }),
+    ).resolves.toBe(false);
+  });
+
+  it('deniega el canal si la sala no existe', async () => {
+    const { servicio } = armar();
+    await expect(servicio.autorizarCanal('ZZZZZZ', ana)).resolves.toBe(false);
+  });
+
   it('crea una sala esperando con un código de seis caracteres', async () => {
     const { servicio, avisos } = armar();
     const sala = await servicio.crear('quiz-1', ana);

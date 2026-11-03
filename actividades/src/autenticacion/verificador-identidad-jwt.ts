@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AUTOR_DEMOSTRACION, IdentidadExterna } from './identidad-externa';
+import { IdentidadExterna } from './identidad-externa';
 import { VerificadorIdentidad } from './verificador-identidad';
 
 interface JwtPayload {
@@ -32,37 +32,49 @@ export class VerificadorIdentidadJwt extends VerificadorIdentidad {
   async verificar(token: string): Promise<IdentidadExterna | null> {
     if (!token) return null;
 
-    // Tokens de prueba/demostración para compatibilidad con suites e2e existentes
-    if (token === 'token-demo' || token === 'demo-token' || token === 'perfil-demo') {
-      return AUTOR_DEMOSTRACION;
-    }
-
     try {
       const partes = token.split('.');
       if (partes.length !== 3) return null;
 
       const [headerB64, payloadB64, signatureB64] = partes;
-      const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf8'));
+      const header = JSON.parse(
+        Buffer.from(headerB64, 'base64url').toString('utf8'),
+      );
       if (header.alg !== 'RS256') return null;
 
-      const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8')) as JwtPayload;
+      const payload = JSON.parse(
+        Buffer.from(payloadB64, 'base64url').toString('utf8'),
+      ) as JwtPayload;
 
       // 1. Validar expiración
       const ahora = Math.floor(Date.now() / 1000);
-      if (payload.exp && payload.exp < ahora) {
+      if (typeof payload.exp !== 'number' || payload.exp <= ahora) {
         return null; // Expirado
       }
 
+      if (typeof payload.nbf === 'number' && payload.nbf > ahora) return null;
+
+      const issuerEsperado = this.config.get<string>(
+        'JWT_ISSUER',
+        'http://localhost:5001',
+      );
+      if (payload.iss !== issuerEsperado) return null;
+
       // 2. Validar audiencia
-      const audienciaEsperada = this.config.get<string>('JWT_AUDIENCE', 'profelink-actividades');
-      if (payload.aud && payload.aud !== audienciaEsperada) {
+      const audienciaEsperada = this.config.get<string>(
+        'JWT_AUDIENCE',
+        'profelink-actividades',
+      );
+      if (payload.aud !== audienciaEsperada) {
         return null;
       }
 
       // 3. Obtener clave pública para validar firma
       const publicKey = await this.obtenerClavePublica(header.kid);
       if (!publicKey) {
-        this.logger.warn('No se encontró clave pública para validar el token JWT.');
+        this.logger.warn(
+          'No se encontró clave pública para validar el token JWT.',
+        );
         return null;
       }
 
@@ -86,7 +98,9 @@ export class VerificadorIdentidadJwt extends VerificadorIdentidad {
     }
   }
 
-  private async obtenerClavePublica(kid?: string): Promise<crypto.KeyObject | string | null> {
+  private async obtenerClavePublica(
+    kid?: string,
+  ): Promise<crypto.KeyObject | string | null> {
     // A. Env var directa
     const envKey = this.config.get<string>('JWT_PUBLIC_KEY');
     if (envKey) return envKey;
@@ -108,13 +122,20 @@ export class VerificadorIdentidadJwt extends VerificadorIdentidad {
     }
 
     // C. Consulta al endpoint JWKS de auth-service
-    const authUrl = this.config.get<string>('AUTH_URL', 'http://localhost:5001').replace(/\/$/, '');
-    const jwksUrl = this.config.get<string>('AUTH_JWKS_URL', `${authUrl}/.well-known/jwks.json`);
+    const authUrl = this.config
+      .get<string>('AUTH_URL', 'http://localhost:5001')
+      .replace(/\/$/, '');
+    const jwksUrl = this.config.get<string>(
+      'AUTH_JWKS_URL',
+      `${authUrl}/.well-known/jwks.json`,
+    );
 
     const ahora = Date.now();
     if (this.jwksCache.length === 0 || ahora - this.ultimaCargaJwks > 60_000) {
       try {
-        const respuesta = await fetch(jwksUrl, { signal: AbortSignal.timeout(3000) });
+        const respuesta = await fetch(jwksUrl, {
+          signal: AbortSignal.timeout(3000),
+        });
         if (respuesta.ok) {
           const datos = (await respuesta.json()) as { keys?: any[] };
           if (datos.keys && Array.isArray(datos.keys)) {
@@ -128,7 +149,9 @@ export class VerificadorIdentidadJwt extends VerificadorIdentidad {
     }
 
     if (this.jwksCache.length > 0) {
-      const match = kid ? this.jwksCache.find((k) => k.kid === kid) : this.jwksCache[0];
+      const match = kid
+        ? this.jwksCache.find((k) => k.kid === kid)
+        : this.jwksCache[0];
       if (match) {
         try {
           return crypto.createPublicKey({
