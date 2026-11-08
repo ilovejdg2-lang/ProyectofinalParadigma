@@ -65,13 +65,13 @@ Validación de API de actividades: `/openapi.json` devuelve el documento OpenAPI
 ## Evidencia observada
 
 - El 2026-11-07 se completó una demo punta a punta con docente y estudiante: creación y recarga de un cuestionario, ingreso a sala, dos respuestas, cálculo de puntaje y consulta del historial. El registro resumido está en [evidencias/demo-punta-a-punta-2026-11-07.md](evidencias/demo-punta-a-punta-2026-11-07.md).
-- La suite de Actividades pasó: 13 suites, 79 pruebas. Las pruebas focalizadas de imágenes pasaron: 8 pruebas. El cliente de carga pasó: 4 pruebas. Estos resultados verifican suites locales, no una prueba de carga contra producción.
+- La suite de Actividades pasó: 13 suites, 79 pruebas. Las pruebas focalizadas de imágenes pasaron: 8 pruebas. El cliente de carga pasó: 4 pruebas. El 2026-11-07, el cliente independiente ejecutó 20 solicitudes GET locales con concurrencia 4: 20/20 exitosas, 0 fallos, p95 235 ms. No se envió carga a producción.
 - El 2026-11-07, la prueba de concurrencia PostgreSQL pasó: 1 suite, 2 pruebas, en una base local desechable recién migrada y sembrada. La variable `ACTIVIDADES_TEST_DATABASE_URL` se definió en la misma sesión de PowerShell que ejecutó Jest.
 - Se observaron trazas de `actividades` en Grafana/Tempo y se verificaron los endpoints de salud públicos después del despliegue previo.
 
 ## Pendientes conocidos
 
-1. No se hizo una carga sostenida contra el despliegue: los tests del cliente verifican el runner y sus límites; la demo en vivo tuvo un solo estudiante.
+1. No se hizo una carga prolongada ni contra el despliegue. Sí se verificó localmente el runner con 20 solicitudes GET concurrentes (máximo 4), pero ese smoke test no es una prueba de capacidad ni de carga sostenida; la demo en vivo tuvo un solo estudiante.
 2. No se verificó el ciclo cargar-imagen → reiniciar servicio → recuperar el objeto desde una nueva sesión. La arquitectura usa Supabase Storage, pero la prueba end-to-end real requiere una escritura temporal y reinicio controlado; no se hizo para no tocar datos ni interrumpir producción sin consentimiento específico.
 3. `cliente-adicional/index.html` todavía manda su JWT WebSocket en un parámetro de consulta. El cliente React y el contrato actualizado usan `Sec-WebSocket-Protocol`; el demo HTML no debe usarse para probar WebSocket hasta alinearlo.
 
