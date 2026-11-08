@@ -48,17 +48,30 @@ Con los servicios locales levantados, el cliente independiente ejecuta solamente
 node .\cliente-adicional\prueba-carga-lectura.mjs
 ```
 
+La prueba de concurrencia real usa una base PostgreSQL local desechable, con la migración y los datos demo aplicados. En PowerShell, exportá `ACTIVIDADES_TEST_DATABASE_URL` en la misma sesión desde la que ejecutás Jest; la URL debe apuntar a `localhost` y el nombre de la base debe comenzar con `actividades_concurrency_test_`:
+
+```powershell
+$env:ACTIVIDADES_TEST_DATABASE_URL = "postgresql://postgres:<password-local>@127.0.0.1:<puerto>/actividades_concurrency_test_demo?schema=public"
+Push-Location .\actividades
+npm run test:postgres:concurrency
+Pop-Location
+Remove-Item Env:ACTIVIDADES_TEST_DATABASE_URL
+```
+
+La prueba crea dos intentos simultáneos de iniciar la misma sala y comprueba que solo uno tenga éxito. No uses una base compartida ni Supabase para este test.
+
 Validación de API de actividades: `/openapi.json` devuelve el documento OpenAPI y `/reference` sirve Scalar. Salud: `/health/ready` para autenticación y `/salud` para actividades. La guía de DigitalOcean está en [despliegue-digitalocean.md](despliegue-digitalocean.md).
 
 ## Evidencia observada
 
 - El 2026-11-07 se completó una demo punta a punta con docente y estudiante: creación y recarga de un cuestionario, ingreso a sala, dos respuestas, cálculo de puntaje y consulta del historial. El registro resumido está en [evidencias/demo-punta-a-punta-2026-11-07.md](evidencias/demo-punta-a-punta-2026-11-07.md).
 - La suite de Actividades pasó: 13 suites, 79 pruebas. Las pruebas focalizadas de imágenes pasaron: 8 pruebas. El cliente de carga pasó: 4 pruebas. Estos resultados verifican suites locales, no una prueba de carga contra producción.
+- El 2026-11-07, la prueba de concurrencia PostgreSQL pasó: 1 suite, 2 pruebas, en una base local desechable recién migrada y sembrada. La variable `ACTIVIDADES_TEST_DATABASE_URL` se definió en la misma sesión de PowerShell que ejecutó Jest.
 - Se observaron trazas de `actividades` en Grafana/Tempo y se verificaron los endpoints de salud públicos después del despliegue previo.
 
 ## Pendientes conocidos
 
-1. La prueba de concurrencia PostgreSQL necesita una base local aislada `actividades_concurrency_test_*`. En esta máquina Jest no recibió `ACTIVITIES_TEST_DATABASE_URL` aunque PowerShell la tenía en el proceso padre; por eso la prueba terminó con el error de variable obligatoria y **no se afirma que la concurrencia real haya pasado**.
+1. La prueba de concurrencia PostgreSQL pasó (1 suite, 2 pruebas) en una base local desechable recién migrada y sembrada. La variable `ACTIVIDADES_TEST_DATABASE_URL` debe definirse en la misma sesión de PowerShell que ejecuta Jest; las instrucciones reproducibles están arriba.
 2. No se hizo una carga sostenida contra el despliegue: los tests del cliente verifican el runner y sus límites; la demo en vivo tuvo un solo estudiante.
 3. No se verificó el ciclo cargar-imagen → reiniciar servicio → recuperar el objeto desde una nueva sesión. La arquitectura usa Supabase Storage, pero la prueba end-to-end real requiere una escritura temporal y reinicio controlado; no se hizo para no tocar datos ni interrumpir producción sin consentimiento específico.
 4. `cliente-adicional/index.html` todavía manda su JWT WebSocket en un parámetro de consulta. El cliente React y el contrato actualizado usan `Sec-WebSocket-Protocol`; el demo HTML no debe usarse para probar WebSocket hasta alinearlo.
