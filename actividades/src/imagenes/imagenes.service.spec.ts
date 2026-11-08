@@ -5,7 +5,7 @@ import {
 import sharp from 'sharp';
 import { PrismaMemoria } from '../../test/prisma-memoria';
 import { AlmacenImagenes, ArchivoAlmacen } from './almacen-imagenes';
-import { subirObjeto } from './almacen-supabase';
+import { retirarObjeto, subirObjeto } from './almacen-supabase';
 import { ImagenesService } from './imagenes.service';
 import { LIMITE_IMAGEN_BYTES } from './validar-archivo';
 import { PrismaService } from '../prisma/prisma.service';
@@ -206,19 +206,28 @@ describe('ImagenesService', () => {
 describe('Almacen de Supabase', () => {
   const origen = {
     url: 'https://proyecto.supabase.co',
-    clave: 'clave-prueba',
+    clave: 'sb_secret-prueba',
+    jwtServicio: 'jwt-service-role-prueba',
     bucket: 'profelink-imagenes',
   };
 
-  it('sube el archivo y devuelve la URL pública', async () => {
-    const solicitudes: { url: string; tipo?: string }[] = [];
+  it('separa la API key del JWT en subida y eliminación de objetos', async () => {
+    const solicitudes: {
+      url: string;
+      tipo?: string;
+      metodo?: string;
+      authorization?: string;
+      apiKey?: string;
+    }[] = [];
     const solicitar = ((url: string | URL, init?: RequestInit) => {
       const cabeceras = new Headers(init?.headers);
       solicitudes.push({
         url: String(url),
         tipo: cabeceras.get('content-type') ?? undefined,
+        metodo: init?.method,
+        authorization: cabeceras.get('authorization') ?? undefined,
+        apiKey: cabeceras.get('apikey') ?? undefined,
       });
-      expect(cabeceras.get('authorization')).toBe('Bearer clave-prueba');
       return Promise.resolve(new Response('{}', { status: 200 }));
     }) as typeof fetch;
 
@@ -234,6 +243,17 @@ describe('Almacen de Supabase', () => {
       'https://proyecto.supabase.co/storage/v1/object/profelink-imagenes/ana/foto.png',
     );
     expect(solicitudes[0]?.tipo).toBe('image/png');
+    expect(solicitudes[0]?.authorization).toBe(
+      'Bearer jwt-service-role-prueba',
+    );
+    expect(solicitudes[0]?.apiKey).toBe('sb_secret-prueba');
+
+    await retirarObjeto(origen, solicitar, 'ana/foto.png');
+    expect(solicitudes[1]).toMatchObject({
+      metodo: 'DELETE',
+      authorization: 'Bearer jwt-service-role-prueba',
+      apiKey: 'sb_secret-prueba',
+    });
   });
 
   it('no reenvía el detalle interno cuando Storage rechaza el archivo', async () => {
