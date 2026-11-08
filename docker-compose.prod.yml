@@ -10,6 +10,7 @@ services:
     ports: !override
       - "127.0.0.1:5002:5002"
     environment:
+      JWT_ISSUER: ${AUTH_PUBLIC_URL:?Set AUTH_PUBLIC_URL in .env.production}
       FRONTEND_URL: ${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN in .env.production}
 
   frontend:
