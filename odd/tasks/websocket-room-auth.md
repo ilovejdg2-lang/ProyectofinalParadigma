@@ -21,9 +21,9 @@ Authorized user direction: “only room host or registered participant can conne
 - Checks: frontend test suite, typecheck, build; Activities endpoint integration where available.
 
 ## Tasks
-- T1 (S1) inline, complete; RED observed; focused verifier spec passes; commit: pending.
-- T2 (S2) inline, complete; RED observed; session and real WebSocket handshake tests pass, including state-hash invariance; commit: pending.
-- T3 (S3) inline, complete; Frontend test/typecheck/build pass; token sent via subprotocol rather than URL query; commit: pending.
+- T1 (S1) inline, complete; RED observed; focused verifier spec passes; commit: 1996272.
+- T2 (S2) inline, complete; RED observed; session and real WebSocket handshake tests pass, including state-hash invariance; commit: 1996272.
+- T3 (S3) inline, complete; Frontend test/typecheck/build pass; token sent via subprotocol rather than URL query; commit: 1996272.
 
 ## Log
 - L1: User authorized implementing valid JWT verification and rejecting unauthorized sockets before external exposure; confirmed policy is host/registered participant only and demo tokens must not work in deployment.
@@ -32,3 +32,4 @@ Authorized user direction: “only room host or registered participant can conne
 - L4: Do not publish images or expose the application until all security and functional checks pass. Supabase remains the database.
 - L5: WebSocket access is authorized before the HTTP upgrade: 401 for absent/invalid JWT, 403 for valid non-member or missing room, and 101 for host/registered participant. Browser credentials are carried in `Sec-WebSocket-Protocol`, not URL query parameters.
 - L6: Post-normalization checks: Activities 12 suites/78 tests and build pass; Frontend 9 tests, typecheck and build pass. Independent verifier passed all S1-S3 and confirmed no mutation on rejected handshakes. No external database or deployment used.
+- L7: Work-unit commit 1996272 contains T1-T3. Native RDD assessment is high-risk; preflight could not proceed because the runtime requested a provider-bound intended-untracked selection JSON schema that the CLI failure did not document. No START transaction or review authority was created; preserve as a pending review blocker.

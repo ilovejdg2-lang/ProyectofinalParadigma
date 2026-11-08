@@ -12,3 +12,16 @@ Simplemente abre `index.html` en cualquier navegador web o sírvelo con:
 ```bash
 npx serve cliente-adicional
 ```
+
+## Verificación concurrente de solo lectura
+
+Con `auth-service` y `actividades` ejecutándose localmente, puedes verificar su disponibilidad y consultar el catálogo desde un cliente Node independiente:
+
+```bash
+node --test cliente-adicional/prueba-carga-lectura.test.mjs
+node cliente-adicional/prueba-carga-lectura.mjs
+```
+
+La prueba envía 20 solicitudes `GET` con concurrencia máxima de 4 y comprueba `/health/ready`, `/salud`, `/banco-preguntas` y `/cuestionarios`. No registra, modifica ni elimina datos. Por seguridad, el cliente solo acepta destinos `localhost`, `127.0.0.1` o `::1`.
+
+Para ajustar una ejecución local, usa `AUTH_URL`, `ACTIVITIES_URL`, `CONCURRENCY` e `ITERATIONS`. La concurrencia permitida es de 1 a 10 y las iteraciones de 4 a 100; no conviene aumentar esos límites para una comprobación de desarrollo.
