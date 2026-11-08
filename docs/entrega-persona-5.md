@@ -71,9 +71,8 @@ Validación de API de actividades: `/openapi.json` devuelve el documento OpenAPI
 
 ## Pendientes conocidos
 
-1. La prueba de concurrencia PostgreSQL pasó (1 suite, 2 pruebas) en una base local desechable recién migrada y sembrada. La variable `ACTIVIDADES_TEST_DATABASE_URL` debe definirse en la misma sesión de PowerShell que ejecuta Jest; las instrucciones reproducibles están arriba.
-2. No se hizo una carga sostenida contra el despliegue: los tests del cliente verifican el runner y sus límites; la demo en vivo tuvo un solo estudiante.
-3. No se verificó el ciclo cargar-imagen → reiniciar servicio → recuperar el objeto desde una nueva sesión. La arquitectura usa Supabase Storage, pero la prueba end-to-end real requiere una escritura temporal y reinicio controlado; no se hizo para no tocar datos ni interrumpir producción sin consentimiento específico.
-4. `cliente-adicional/index.html` todavía manda su JWT WebSocket en un parámetro de consulta. El cliente React y el contrato actualizado usan `Sec-WebSocket-Protocol`; el demo HTML no debe usarse para probar WebSocket hasta alinearlo.
+1. No se hizo una carga sostenida contra el despliegue: los tests del cliente verifican el runner y sus límites; la demo en vivo tuvo un solo estudiante.
+2. No se verificó el ciclo cargar-imagen → reiniciar servicio → recuperar el objeto desde una nueva sesión. La arquitectura usa Supabase Storage, pero la prueba end-to-end real requiere una escritura temporal y reinicio controlado; no se hizo para no tocar datos ni interrumpir producción sin consentimiento específico.
+3. `cliente-adicional/index.html` todavía manda su JWT WebSocket en un parámetro de consulta. El cliente React y el contrato actualizado usan `Sec-WebSocket-Protocol`; el demo HTML no debe usarse para probar WebSocket hasta alinearlo.
 
 Estos pendientes están separados de los checks que sí se observaron. No se publicó una imagen a un registry ni se redeployó como parte de este cierre.
