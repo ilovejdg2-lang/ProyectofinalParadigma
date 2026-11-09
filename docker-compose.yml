@@ -1,5 +1,6 @@
 services:
   auth-service:
+    image: proyectofinalparadigma-auth-service:${IMAGE_TAG:-latest}
     build:
       context: ./autenticacion
       dockerfile: Dockerfile
@@ -32,6 +33,7 @@ services:
 
   # Servicio de Actividades (Persona 2)
   actividades:
+    image: proyectofinalparadigma-actividades:${IMAGE_TAG:-latest}
     build:
       context: ./actividades
       dockerfile: Dockerfile

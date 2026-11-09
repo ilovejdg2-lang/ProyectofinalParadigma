@@ -14,6 +14,7 @@ services:
       FRONTEND_URL: ${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN in .env.production}
 
   frontend:
+    image: proyectofinalparadigma-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
