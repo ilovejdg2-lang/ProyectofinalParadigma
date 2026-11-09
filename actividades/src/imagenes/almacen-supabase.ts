@@ -1,11 +1,13 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AlmacenImagenes, ArchivoAlmacen } from './almacen-imagenes';
-import { MENSAJE_TAMANO_IMAGEN, MENSAJE_TIPO_IMAGEN } from './validar-archivo';
+import { MENSAJE_TIPO_IMAGEN } from './limites';
+import { MENSAJE_TAMANO_IMAGEN } from './validar-archivo';
 
 interface ConfiguracionAlmacen {
   url: string;
@@ -35,7 +37,12 @@ export class AlmacenSupabase extends AlmacenImagenes {
       this.config.get<string>('SUPABASE_SERVICE_ROLE_JWT')?.trim() ?? '';
     const bucket =
       this.config.get<string>('SUPABASE_STORAGE_BUCKET')?.trim() ?? '';
-    if (!url.startsWith('https://') || !clave || !jwtServicio || !bucket) {
+    if (
+      !url.startsWith('https://') ||
+      !clave ||
+      !esJwtCompacto(jwtServicio) ||
+      !bucket
+    ) {
       throw new ServiceUnavailableException({
         mensaje: 'El almacenamiento de imágenes no está disponible.',
       });
@@ -56,7 +63,7 @@ export async function subirObjeto(
     body: new Uint8Array(archivo.contenido),
   });
   if (respuesta.ok) return urlPublica(origen, ruta);
-  throw errorDeStorage(respuesta.status);
+  throw errorDeCarga(respuesta.status);
 }
 
 export async function retirarObjeto(
@@ -96,6 +103,11 @@ function cabeceras(
   };
 }
 
+function esJwtCompacto(valor: string): boolean {
+  const segmentos = valor.split('.');
+  return segmentos.length === 3 && segmentos.every((segmento) => segmento);
+}
+
 function rutaSegura(ruta: string): string {
   if (!/^[A-Za-z0-9_./-]+$/.test(ruta) || ruta.includes('..')) {
     throw new BadRequestException({ mensaje: 'No se pudo guardar la imagen.' });
@@ -118,6 +130,15 @@ async function pedir(
       mensaje: 'No se pudo guardar la imagen.',
     });
   }
+}
+
+function errorDeCarga(estado: number): Error {
+  if (estado === 400 || estado === 415) {
+    return new BadGatewayException({
+      mensaje: `El almacenamiento rechazó la carga de la imagen (HTTP ${estado}).`,
+    });
+  }
+  return errorDeStorage(estado);
 }
 
 function errorDeStorage(estado: number): Error {

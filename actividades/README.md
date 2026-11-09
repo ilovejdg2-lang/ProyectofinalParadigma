@@ -74,7 +74,8 @@ No hace falta crear otro proyecto Supabase ni levantar PostgreSQL en local para 
 | `PORT` | Puerto HTTP. Por defecto `5002`, el mismo que `VITE_ACTIVIDADES_URL`. |
 | `FRONTEND_URL` | Origen CORS. Por defecto `http://localhost:5173`. Métodos `GET`, `POST`, `PUT`, `DELETE` y `OPTIONS`. |
 | `SUPABASE_URL` | Proyecto de Storage. |
-| `SUPABASE_SECRET_KEY` | Clave secreta solo de este backend. No va al frontend. |
+| `SUPABASE_SECRET_KEY` | Clave secreta moderna, exclusiva del backend. Se envía en `apikey`, no como Bearer JWT; nunca va al frontend. |
+| `SUPABASE_SERVICE_ROLE_JWT` | JWT válido del rol de servicio para `Authorization: Bearer`. Debe ser distinto de la clave `sb_secret_`; es una credencial de máximo privilegio y solo vive en el backend. |
 | `SUPABASE_STORAGE_BUCKET` | Bucket público. El previsto es `profelink-imagenes`. |
 
 La plantilla con valores de ejemplo está en `.env.example`. No copies contraseñas a este README ni al repositorio.
@@ -222,7 +223,7 @@ Errores propios de esta familia:
 | 400 | `Selecciona una imagen.`, `El archivo de imagen está vacío.` o `Usa una imagen JPG, PNG, WEBP, GIF o SVG.` |
 | 400 | SVG rechazado por la revisión de contenido o por un fallo de conversión. |
 | 413 | `La imagen supera 5 MB.` |
-| 503 | `El almacenamiento de imágenes no está disponible.` Faltan `SUPABASE_URL`, `SUPABASE_SECRET_KEY` o `SUPABASE_STORAGE_BUCKET`. |
+| 503 | `El almacenamiento de imágenes no está disponible.` Falta `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_JWT` válido o `SUPABASE_STORAGE_BUCKET`. |
 
 Las pruebas sustituyen el almacenamiento y no escriben objetos en el bucket.
 
@@ -545,7 +546,7 @@ Las animaciones, la gamificación visual, la experiencia, las insignias y cualqu
 
 ## Integración e infraestructura — Persona 5
 
-Dependencias externas de este módulo: PostgreSQL de Supabase por `DIRECT_URL`, y Supabase Storage por `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_STORAGE_BUCKET`. El resto de las variables está en [Configuración](#configuración). `@nestjs/config` está fijado en `^4.0.4` porque una versión ESM posterior rompe el arranque.
+Dependencias externas de este módulo: PostgreSQL de Supabase por `DIRECT_URL`, y Supabase Storage por `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_JWT` y `SUPABASE_STORAGE_BUCKET`. La clave moderna `sb_secret_` es opaca, no es un JWT, y se envía solo en `apikey`; `Authorization: Bearer` usa por separado un JWT válido del rol de servicio. No reutilices la clave moderna en ambos encabezados. El resto de las variables está en [Configuración](#configuración). `@nestjs/config` está fijado en `^4.0.4` porque una versión ESM posterior rompe el arranque.
 
 Arranque local, con `.env` ya completo:
 
