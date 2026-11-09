@@ -18,7 +18,10 @@ export const TAMANO_MAXIMO_IMAGEN = 15_000_000
 export function validarImagen(archivo: File): string | null {
   const tipo = archivo.type === 'image/jpg' ? 'image/jpeg' : archivo.type
   const extensionOk = /\.(jpe?g|png|webp|gif|svg)$/i.test(archivo.name)
-  const tipoValido = TIPOS_IMAGEN.includes(tipo) || (tipo === '' && extensionOk) || tipo.startsWith('image/')
+  const tipoValido =
+    TIPOS_IMAGEN.includes(tipo) ||
+    ((tipo === '' || tipo === 'application/octet-stream') && extensionOk) ||
+    tipo.startsWith('image/')
   if (!tipoValido) {
     return 'Usa una imagen JPG, PNG, WEBP, GIF o SVG.'
   }

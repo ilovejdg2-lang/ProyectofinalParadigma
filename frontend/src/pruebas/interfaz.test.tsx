@@ -107,6 +107,14 @@ describe('cuestionarios', () => {
     const archivo = new File(['hola'], 'nota.txt', { type: 'text/plain' })
     expect(validarImagen(archivo)).toMatch(/JPG/)
   })
+
+  it('acepta una extensión de imagen permitida cuando el navegador informa un MIME genérico', () => {
+    const png = new File(['contenido'], 'imagen.png', { type: 'application/octet-stream' })
+    const archivoDesconocido = new File(['contenido'], 'nota.txt', { type: 'application/octet-stream' })
+
+    expect(validarImagen(png)).toBeNull()
+    expect(validarImagen(archivoDesconocido)).toMatch(/JPG/)
+  })
 })
 
 describe('partida y resultados', () => {
