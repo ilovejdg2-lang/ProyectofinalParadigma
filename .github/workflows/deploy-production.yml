@@ -1,0 +1,133 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: profelink-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    environment:
+      name: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate deployment settings
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+          FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN }}
+          AUTH_PUBLIC_URL: ${{ vars.AUTH_PUBLIC_URL }}
+          ACTIVIDADES_PUBLIC_URL: ${{ vars.ACTIVIDADES_PUBLIC_URL }}
+          CANAL_PUBLIC_URL: ${{ vars.CANAL_PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]{1,5}$ ]]
+          (( DEPLOY_PORT > 0 && DEPLOY_PORT <= 65535 ))
+          [[ -n "$SSH_KNOWN_HOSTS" ]]
+          [[ "$FRONTEND_ORIGIN" == https://* ]] || { echo "Expected public HTTPS frontend URL" >&2; exit 1; }
+          [[ "$AUTH_PUBLIC_URL" == https://* ]] || { echo "Expected public HTTPS auth URL" >&2; exit 1; }
+          [[ "$ACTIVIDADES_PUBLIC_URL" == https://* ]] || { echo "Expected public HTTPS activities URL" >&2; exit 1; }
+          [[ "$CANAL_PUBLIC_URL" == wss://* ]] || { echo "Expected public WSS channel URL" >&2; exit 1; }
+
+      - name: Build immutable production images
+        shell: bash
+        env:
+          FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN }}
+          AUTH_PUBLIC_URL: ${{ vars.AUTH_PUBLIC_URL }}
+          ACTIVIDADES_PUBLIC_URL: ${{ vars.ACTIVIDADES_PUBLIC_URL }}
+          CANAL_PUBLIC_URL: ${{ vars.CANAL_PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build --pull --file autenticacion/Dockerfile \
+            --tag "proyectofinalparadigma-auth-service:$tag" autenticacion
+          docker build --pull --file actividades/Dockerfile \
+            --tag "proyectofinalparadigma-actividades:$tag" actividades
+          docker build --pull --file frontend/Dockerfile \
+            --build-arg "VITE_AUTH_URL=$AUTH_PUBLIC_URL" \
+            --build-arg "VITE_ACTIVIDADES_URL=$ACTIVIDADES_PUBLIC_URL" \
+            --build-arg "VITE_CANAL_URL=$CANAL_PUBLIC_URL" \
+            --build-arg VITE_USAR_SIMULACION=false \
+            --tag "proyectofinalparadigma-frontend:$tag" frontend
+
+          release_dir="$RUNNER_TEMP/profelink-release"
+          mkdir -p "$release_dir"
+          docker save --output "$release_dir/release.tar" \
+            "proyectofinalparadigma-auth-service:$tag" \
+            "proyectofinalparadigma-actividades:$tag" \
+            "proyectofinalparadigma-frontend:$tag"
+          archive_sha=$(sha256sum "$release_dir/release.tar" | cut -d ' ' -f 1)
+          printf '%s %s\n' "$archive_sha" "$tag" > "$release_dir/release.manifest"
+
+      - name: Upload release over restricted SFTP
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+          DEPLOY_UPLOAD_KEY: ${{ secrets.DEPLOY_UPLOAD_SSH_KEY }}
+          DEPLOY_TRIGGER_SSH_KEY: ${{ secrets.DEPLOY_TRIGGER_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$DEPLOY_UPLOAD_KEY" ]]
+          [[ -n "$DEPLOY_TRIGGER_SSH_KEY" ]]
+          ssh_dir="$RUNNER_TEMP/profelink-upload-ssh"
+          mkdir -m 700 "$ssh_dir"
+          printf '%s\n' "$DEPLOY_UPLOAD_KEY" > "$ssh_dir/id_ed25519"
+          printf '%s\n' "$DEPLOY_TRIGGER_SSH_KEY" > "$ssh_dir/deploy-signing-key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/id_ed25519" "$ssh_dir/deploy-signing-key" "$ssh_dir/known_hosts"
+          cd "$RUNNER_TEMP/profelink-release"
+          ssh-keygen -Y sign -n profelink-release -f "$ssh_dir/deploy-signing-key" release.manifest
+          printf '%s\n' \
+            "put release.tar release-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar" \
+            "put release.manifest release-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.manifest" \
+            "put release.manifest.sig release-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.manifest.sig" |
+            sftp -b - -P "$DEPLOY_PORT" \
+              -i "$ssh_dir/id_ed25519" \
+              -o IdentitiesOnly=yes \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+              "profelink-ci-upload@$DEPLOY_HOST"
+
+      - name: Trigger the fixed server-side deployment
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+          DEPLOY_TRIGGER_KEY: ${{ secrets.DEPLOY_TRIGGER_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$DEPLOY_TRIGGER_KEY" ]]
+          ssh_dir="$RUNNER_TEMP/profelink-trigger-ssh"
+          mkdir -m 700 "$ssh_dir"
+          printf '%s\n' "$DEPLOY_TRIGGER_KEY" > "$ssh_dir/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/id_ed25519" "$ssh_dir/known_hosts"
+          ssh -T -p "$DEPLOY_PORT" \
+            -i "$ssh_dir/id_ed25519" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+            profelink-ci-trigger@"$DEPLOY_HOST" "deploy ${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

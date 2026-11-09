@@ -27,7 +27,7 @@ export interface ClienteSala {
   crear(token: string, cuestionarioId: string): Promise<Sala>
   unirse(token: string, codigo: string): Promise<Sala>
   obtener(token: string, codigo: string): Promise<Sala>
-  suscribir(codigo: string, alCambiar: (sala: Sala) => void): () => void
+  suscribir(codigo: string, token: string, alCambiar: (sala: Sala) => void): () => void
   iniciar(token: string, codigo: string): Promise<Sala>
   responder(token: string, codigo: string, valor: boolean | string): Promise<Sala>
   cerrarPregunta(token: string, codigo: string): Promise<Sala>
@@ -218,7 +218,7 @@ export function crearSalaSimulada(
       await exigirPerfil(autenticacion, token)
       return exigirSala(leerSalas(almacen), codigo)
     },
-    suscribir(codigo, alCambiar) {
+    suscribir(codigo, _token, alCambiar) {
       const normalizado = codigo.toUpperCase()
       let mapa = registros.get(almacen)
       if (!mapa) {
@@ -536,9 +536,12 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
       if (!respuesta.ok) throw new ErrorServicio('conexion', await mensaje(respuesta))
       return normalizarYValidarResultado((await respuesta.json()) as ResumenResultado)
     },
-    suscribir(codigo, alCambiar) {
+    suscribir(codigo, token, alCambiar) {
       if (typeof WebSocket === 'undefined' || !canalUrl) return () => undefined
-      const socket = new WebSocket(`${canalUrl}?codigo=${codigo}`)
+      const socket = new WebSocket(
+        `${canalUrl}?codigo=${encodeURIComponent(codigo)}`,
+        ['profelink', `profelink-bearer.${token}`],
+      )
       socket.onopen = () => {
         conexion = 'conectado'
       }

@@ -1,5 +1,6 @@
 services:
   auth-service:
+    image: proyectofinalparadigma-auth-service:${IMAGE_TAG:-latest}
     build:
       context: ./autenticacion
       dockerfile: Dockerfile
@@ -7,6 +8,8 @@ services:
     restart: unless-stopped
     ports:
       - "5001:5001"
+    env_file:
+      - ./autenticacion/.env
     environment:
       - PORT=5001
       - FRONTEND_URL=http://localhost:5173
@@ -17,8 +20,10 @@ services:
       - REGISTRATION_MODE=open
       - EMAIL_AUTO_VERIFY=true
       - RSA_KEYS_DIR=/app/datos/keys
+      - NODE_EXTRA_CA_CERTS=/app/certs/supabase-root.crt
     volumes:
       - auth-keys:/app/datos/keys
+      - ./autenticacion/certs/supabase-root.crt:/app/certs/supabase-root.crt:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5001/health/live"]
       interval: 15s
@@ -28,6 +33,7 @@ services:
 
   # Servicio de Actividades (Persona 2)
   actividades:
+    image: proyectofinalparadigma-actividades:${IMAGE_TAG:-latest}
     build:
       context: ./actividades
       dockerfile: Dockerfile
@@ -35,12 +41,17 @@ services:
     restart: unless-stopped
     ports:
       - "5002:5002"
+    env_file:
+      - ./actividades/.env
     environment:
       - PORT=5002
       - FRONTEND_URL=http://localhost:5173
       - AUTH_URL=http://auth-service:5001
       - AUTH_JWKS_URL=http://auth-service:5001/.well-known/jwks.json
       - JWT_AUDIENCE=profelink-actividades
+      - NODE_EXTRA_CA_CERTS=/app/certs/supabase-root.crt
+    volumes:
+      - ./autenticacion/certs/supabase-root.crt:/app/certs/supabase-root.crt:ro
     depends_on:
       auth-service:
         condition: service_healthy

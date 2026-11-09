@@ -6,10 +6,11 @@ Este documento describe la especificación del canal en tiempo real implementado
 
 ## 1. Conexión y Autenticación del Canal
 
-- **URL de Conexión**: `ws://<HOST_ACTIVIDADES>:<PORT>/canal?codigo=<CODIGO_SALA>&access_token=<JWT_TOKEN>`
+- **URL de Conexión**: `wss://<HOST_ACTIVIDADES>/canal?codigo=<CODIGO_SALA>` (en desarrollo local: `ws://localhost:5002/canal?codigo=<CODIGO_SALA>`).
 - **Autenticación**:
-  - En entornos WebSocket donde las cabeceras `Authorization` no pueden ser enviadas por el navegador, el cliente provee el token en el parámetro de consulta `access_token`.
-  - El servidor valida la firma asimétrica **RS256** del token contra `auth-service` y vincula la conexión a la identidad verificada (`id`, `nombre`, `role`).
+  - El navegador envía el JWT en el subprotocolo `profelink-bearer.<JWT_TOKEN>` junto con el protocolo `profelink`: `new WebSocket(url, ['profelink', 'profelink-bearer.' + token])`.
+  - El token no debe incluirse en la URL: las URL pueden quedar en registros, historial o telemetría.
+  - El servidor valida la firma asimétrica **RS256** del token contra `auth-service` y vincula la conexión a la identidad verificada (`id`, `nombre`, `role`). También comprueba que la identidad sea el anfitrión o un participante registrado de esa sala.
 
 ---
 

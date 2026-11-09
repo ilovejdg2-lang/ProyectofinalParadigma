@@ -19,11 +19,7 @@ ProyectofinalParadigma/
 
 ## 1. Cuentas de Demostración Sembradas
 
-| Rol | Correo | Contraseña por Defecto | Permisos |
-|---|---|---|---|
-| **Docente** (`teacher`) | `profesor@una.cr` | `Profesor123!` | Crear/editar cuestionarios y preguntas, crear y controlar salas en vivo |
-| **Estudiante** (`student`) | `estudiante@est.una.ac.cr` | `Estudiante123!` | Unirse a salas, enviar respuestas en vivo, ver clasificación |
-| **Administrador** (`admin`) | `admin@una.cr` | `Admin123!` | Administrar políticas de dominio e instituciones |
+Las cuentas de demostración son administradas por el equipo para la presentación. No publiques contraseñas en este repositorio; solicita las credenciales de prueba por un canal privado.
 
 ---
 
@@ -50,7 +46,7 @@ npm run build
 npm run start:dev
 ```
 - API REST: `http://localhost:5002`
-- Canal WebSocket en vivo: `ws://localhost:5002/canal?codigo=ABCDEF`
+- Canal WebSocket en vivo: `ws://localhost:5002/canal?codigo=ABCDEF`; el JWT del navegador se envía mediante `Sec-WebSocket-Protocol`, nunca como parámetro de URL.
 - Pruebas unitarias: `npm test`
 
 ### C. Frontend Web (`frontend`)
@@ -61,21 +57,27 @@ npm run dev
 ```
 - Interfaz web: `http://localhost:5173`
 
-### D. Cliente Adicional de Demostración (`cliente-adicional`)
-Abre `cliente-adicional/index.html` en el navegador para probar el login, la rotación de refresh tokens, el consumo con Bearer token y el WebSocket de salas.
+### D. Cliente Adicional (`cliente-adicional`)
+Consulta su [guía de uso](cliente-adicional/README.md) para las pruebas REST independientes. Su ejemplo WebSocket aún requiere alinearse con el protocolo autenticado descrito en [eventos en vivo](docs/eventos-en-vivo.md); no envíes JWT en parámetros de URL.
 
 ---
 
 ## 3. Despliegue con Docker Compose
 
+El siguiente comando inicia la configuración local de desarrollo:
+
 ```bash
 docker compose up --build
 ```
+
+La configuración preparada para el Droplet de DigitalOcean, Caddy, HTTPS y los subdominios se documenta en [Preparación del despliegue en DigitalOcean](docs/despliegue-digitalocean.md). Esa guía no implica que el proyecto ya esté publicado.
 
 ---
 
 ## 4. Documentación Detallada
 
-- [Flujos de Autenticación y Criptografía RS256](file:///docs/auth.md)
-- [Protocolo de Eventos en Tiempo Real](file:///docs/eventos-en-vivo.md)
-- [Registro de Decisiones de Arquitectura (ADR)](file:///docs/decisiones/arquitectura.md)
+- [Cierre de Persona 5: arquitectura, pruebas y pendientes](docs/entrega-persona-5.md)
+- [Flujos de Autenticación y Criptografía RS256](docs/auth.md)
+- [Protocolo de Eventos en Tiempo Real](docs/eventos-en-vivo.md)
+- [Registro de Decisiones de Arquitectura (ADR)](docs/decisiones/arquitectura.md)
+- [Preparación del despliegue en DigitalOcean](docs/despliegue-digitalocean.md)

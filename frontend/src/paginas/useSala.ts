@@ -30,12 +30,13 @@ export function useSala(codigo: string) {
 
   useEffect(() => {
     void recargar()
-    return cliente.suscribir(codigo, (siguiente) => {
+    if (!token) return
+    return cliente.suscribir(codigo, token, (siguiente) => {
       setSala(siguiente)
       setError(null)
       setConexion(cliente.estadoConexion())
     })
-  }, [cliente, codigo, recargar])
+  }, [cliente, codigo, recargar, token])
 
   useEffect(() => {
     const alVolver = () => {
