@@ -1,4 +1,5 @@
 import { ordenarClasificacion } from '../dominio/filtros.ts'
+import { formatoSegundos } from '../juego/puntuacion.ts'
 import { Avatar, avatarVisible } from '../juego/avatares.tsx'
 import { Confeti } from '../juego/Confeti.tsx'
 
@@ -9,6 +10,7 @@ interface PersonaPodio {
   avatarId?: string
   puntaje: number
   aciertos: number
+  tiempoMs?: number
 }
 
 export function Podio({ participantes, perfilId }: { participantes: PersonaPodio[]; perfilId?: string }) {
@@ -16,7 +18,12 @@ export function Podio({ participantes, perfilId }: { participantes: PersonaPodio
   const cima = orden.slice(0, 3)
   const hayEmpate = orden.some((item, indice) => {
     const siguiente = orden[indice + 1]
-    return Boolean(siguiente && item.puntaje === siguiente.puntaje && item.aciertos === siguiente.aciertos)
+    return Boolean(
+      siguiente &&
+        item.puntaje === siguiente.puntaje &&
+        item.aciertos === siguiente.aciertos &&
+        (item.tiempoMs ?? 0) === (siguiente.tiempoMs ?? 0),
+    )
   })
 
   return (
@@ -33,6 +40,7 @@ export function Podio({ participantes, perfilId }: { participantes: PersonaPodio
               <strong>{participante.nombre}</strong>
               <span>
                 {participante.puntaje} pts · {participante.aciertos} aciertos
+                {participante.tiempoMs ? ` · ${formatoSegundos(participante.tiempoMs)} s` : ''}
               </span>
             </div>
             <div className="podio-base" aria-hidden="true">
@@ -42,7 +50,7 @@ export function Podio({ participantes, perfilId }: { participantes: PersonaPodio
         ))}
       </ol>
       {hayEmpate ? (
-        <p className="meta">Si empatan en puntos y aciertos, el puesto lo define el nombre en orden alfabético.</p>
+        <p className="meta">Si empatan en puntos y en rapidez, el puesto lo define el nombre en orden alfabético.</p>
       ) : null}
       {orden.length > 3 ? (
         <ol className="clasificacion-completa" aria-label="Clasificación completa">
@@ -53,6 +61,7 @@ export function Podio({ participantes, perfilId }: { participantes: PersonaPodio
               <strong>{participante.nombre}</strong>
               <span>
                 {participante.puntaje} pts · {participante.aciertos} aciertos
+                {participante.tiempoMs ? ` · ${formatoSegundos(participante.tiempoMs)} s` : ''}
               </span>
             </li>
           ))}

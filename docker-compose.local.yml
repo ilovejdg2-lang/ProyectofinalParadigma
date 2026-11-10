@@ -69,7 +69,7 @@ services:
     volumes:
       - profelink-local-auth-keys:/app/datos/keys
     ports:
-      - "127.0.0.1:5001:5001"
+      - "5001:5001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,8 +99,12 @@ services:
       OTEL_TRACES_EXPORTER: otlp
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      ALMACEN_IMAGENES_DIR: /app/almacen-imagenes
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://127.0.0.1:5002}
+    volumes:
+      - profelink-local-imagenes:/app/almacen-imagenes
     ports:
-      - "127.0.0.1:5002:5002"
+      - "5002:5002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,7 +129,7 @@ services:
         VITE_CANAL_URL: ws://localhost:5002/canal
         VITE_USAR_SIMULACION: "false"
     ports:
-      - "127.0.0.1:${LOCAL_FRONTEND_PORT:-5173}:8080"
+      - "${LOCAL_FRONTEND_PORT:-5173}:8080"
     depends_on:
       auth-service:
         condition: service_healthy
@@ -141,11 +145,19 @@ services:
   otel-lgtm:
     image: grafana/otel-lgtm:0.39.0
     ports:
-      - "127.0.0.1:${LOCAL_GRAFANA_PORT:-3000}:3000"
+      - "127.0.0.1:${LOCAL_GRAFANA_PORT:-3020}:3000"
+      - "127.0.0.1:${LOCAL_OTEL_PORT:-4320}:4318"
     volumes:
       - profelink-local-otel:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
 
 volumes:
   profelink-local-db:
   profelink-local-auth-keys:
+  profelink-local-imagenes:
   profelink-local-otel:

@@ -24,6 +24,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Fotos subidas en local. En Docker viven en el volumen profelink-local-imagenes.
+actividades/almacen-imagenes/
+
 # Pruebas visuales
 playwright-report/
 test-results/

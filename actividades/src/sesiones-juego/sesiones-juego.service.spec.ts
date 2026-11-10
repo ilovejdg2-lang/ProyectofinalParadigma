@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -542,6 +543,68 @@ describe('SesionesJuegoService', () => {
     expect(error.getResponse().mensaje).toBe(
       'La base de datos no está disponible.',
     );
+  });
+
+  it('solo matricula en el curso a quien entra a una evaluación', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({ id: 'curso-1', nombre: 'Paradigmas', docenteId: 'ana' });
+    memoria.matriculas.push({ cursoId: 'curso-1', estudianteId: 'luis' });
+    const sala = await servicio.crear('quiz-1', ana, {
+      modo: 'evaluacion',
+      cursoId: 'curso-1',
+      nombreEvaluacion: 'Quiz 1',
+      notaMaxima: 100,
+      valorPorcentaje: 10,
+      notaMinima: 70,
+    });
+    expect(sala.evaluacion).toMatchObject({
+      cursoId: 'curso-1',
+      nombre: 'Quiz 1',
+      valorPorcentaje: 10,
+    });
+    await expect(servicio.unirse(sala.codigo, luis)).resolves.toMatchObject({
+      codigo: sala.codigo,
+    });
+    const ajeno = await rechazo(
+      servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' }),
+    );
+    expect(ajeno).toBeInstanceOf(ForbiddenException);
+  });
+
+  it('matricula en el curso por defecto a quien entra con su cuenta', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({
+      id: 'curso-paradigmas',
+      nombre: 'Paradigmas de Programación',
+      docenteId: 'ana',
+    });
+    const sala = await servicio.crear('quiz-1', ana, {
+      modo: 'evaluacion',
+      cursoId: 'curso-paradigmas',
+      valorPorcentaje: 10,
+    });
+    await expect(servicio.unirse(sala.codigo, { id: 'nueva', nombre: 'Nueva' })).resolves.toMatchObject({
+      codigo: sala.codigo,
+    });
+    expect(memoria.matriculas).toEqual(
+      expect.arrayContaining([{ cursoId: 'curso-paradigmas', estudianteId: 'nueva' }]),
+    );
+  });
+
+  it('no deja entrar a una partida del curso a quien no está matriculado', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({ id: 'curso-1', nombre: 'Paradigmas', docenteId: 'ana' });
+    const sala = await servicio.crear('quiz-1', ana, { modo: 'practica', cursoId: 'curso-1' });
+    const ajeno = await rechazo(servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' }));
+    expect(ajeno).toBeInstanceOf(ForbiddenException);
+  });
+
+  it('no abre una evaluación sin curso del docente', async () => {
+    const { servicio } = armar();
+    const error = await rechazo(
+      servicio.crear('quiz-1', ana, { modo: 'evaluacion', valorPorcentaje: 10 }),
+    );
+    expect(error).toBeInstanceOf(BadRequestException);
   });
 });
 

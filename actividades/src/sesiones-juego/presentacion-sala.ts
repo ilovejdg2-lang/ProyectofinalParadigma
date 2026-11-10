@@ -20,6 +20,8 @@ export interface InstantaneaPreguntas {
   preguntas: PreguntaInstantanea[];
   /** Fin de la cuenta 3-2-1. Solo aplica a la primera pregunta. */
   abreEn?: string;
+  /** Copia congelada al iniciar. El docente la edita en el cuestionario. */
+  puntosPorAcierto?: number;
 }
 
 export const MILISEGUNDOS_CUENTA = 4_500;
@@ -43,6 +45,8 @@ export interface ParticipantePublico {
   conectado: boolean;
   puntaje: number;
   aciertos: number;
+  /** Milisegundos sumados de los aciertos. Menor tiempo queda más arriba. */
+  tiempoMs: number;
   respuestas: RespuestaPublica[];
 }
 
@@ -55,6 +59,7 @@ export interface SalaPublica {
   estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada';
   preguntaActual: number;
   segundos: number;
+  puntosPorAcierto: number;
   iniciaEn: string | null;
   cierraEn: string | null;
   elegibles: string[];
@@ -69,6 +74,14 @@ export interface SalaPublica {
     opciones: Array<{ id: string; texto: string; correcta?: boolean }>;
   }>;
   canal: 'remoto';
+  evaluacion?: {
+    cursoId: string;
+    cursoNombre: string;
+    nombre: string;
+    notaMaxima: number;
+    valorPorcentaje: number;
+    notaMinima: number;
+  };
 }
 
 interface FilaOpcion {
@@ -106,6 +119,7 @@ export interface FilaParticipante {
   conectado: boolean;
   puntaje: number;
   aciertos: number;
+  tiempoMs?: number;
   incorporadoEn?: Date | string;
   respuestas?: FilaRespuesta[];
 }
@@ -125,8 +139,16 @@ export interface FilaSesion {
   elegibles?: string[];
   finalizadaEn?: Date | string | null;
   preguntasInstantanea?: unknown;
+  modoAcademico?: string;
+  cursoId?: string | null;
+  cursoNombre?: string | null;
+  nombreEvaluacion?: string | null;
+  notaMaxima?: number;
+  valorPorcentaje?: number;
+  notaMinima?: number;
   cuestionario?: {
     eliminadoEn?: Date | string | null;
+    puntosPorAcierto?: number;
     preguntas: FilaPregunta[];
   } | null;
   participantes: FilaParticipante[];
@@ -224,11 +246,24 @@ export function presentarSala(
     estado: fila.estado,
     preguntaActual: fila.preguntaActual,
     segundos: fila.segundos,
+    puntosPorAcierto: puntosDeSala(fila),
     iniciaEn: fila.iniciaEn ? new Date(fila.iniciaEn).toISOString() : null,
     cierraEn: fila.cierraEn ? new Date(fila.cierraEn).toISOString() : null,
     elegibles: fila.elegibles ?? [],
     abreEn: abreEnDe(fila),
     canal: 'remoto',
+    ...(fila.modoAcademico === 'evaluacion' && fila.cursoId
+      ? {
+          evaluacion: {
+            cursoId: fila.cursoId,
+            cursoNombre: fila.cursoNombre ?? '',
+            nombre: fila.nombreEvaluacion || fila.titulo,
+            notaMaxima: fila.notaMaxima ?? 100,
+            valorPorcentaje: fila.valorPorcentaje ?? 0,
+            notaMinima: fila.notaMinima ?? 70,
+          },
+        }
+      : {}),
     participantes: [...fila.participantes]
       .sort((a, b) => fecha(a) - fecha(b))
       .map((participante) => ({
@@ -239,6 +274,7 @@ export function presentarSala(
         conectado: participante.conectado,
         puntaje: participante.puntaje,
         aciertos: participante.aciertos,
+        tiempoMs: participante.tiempoMs ?? 0,
         respuestas: [...(participante.respuestas ?? [])]
           .sort((a, b) => fechaRespuesta(a) - fechaRespuesta(b))
           .map((respuesta) =>
@@ -254,6 +290,14 @@ export function presentarSala(
       presentarPregunta(pregunta, visibilidad(fila, indice)),
     ),
   };
+}
+
+export function puntosDeSala(fila: Pick<FilaSesion, 'preguntasInstantanea' | 'cuestionario'>): number {
+  const instantanea = leerInstantanea(fila.preguntasInstantanea);
+  const guardado = instantanea?.puntosPorAcierto ?? fila.cuestionario?.puntosPorAcierto;
+  const numero = typeof guardado === 'number' ? guardado : Number(guardado);
+  if (!Number.isInteger(numero) || numero < 1) return 1;
+  return Math.min(100, numero);
 }
 
 function enVivo(fila: FilaSesion): PreguntaInstantanea[] {
@@ -351,6 +395,7 @@ export function ordenarClasificacion(
   return [...participantes].sort(
     (a, b) =>
       b.puntaje - a.puntaje ||
+      a.tiempoMs - b.tiempoMs ||
       b.aciertos - a.aciertos ||
       a.nombre.localeCompare(b.nombre, 'es') ||
       a.id.localeCompare(b.id),

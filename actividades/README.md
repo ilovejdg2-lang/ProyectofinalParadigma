@@ -538,7 +538,7 @@ El cliente HTTP traduce 403, 404 y 409 a tipos propios, pero el texto visible si
 
 ## Integración con motor de juego — Persona 4
 
-La puntuación oficial es la de esta API: **1 punto por acierto y 0 por error o por no responder.** Se decide al cerrar, con la instantánea, y queda en `Respuesta.puntos`, `Participante.puntaje` y `Participante.aciertos`. El resultado final repite esos números y agrega `incorrectas`.
+La puntuación oficial es la de esta API: **los puntos del cuestionario por acierto y 0 por error o por no responder.** El valor por defecto es 1 y el docente puede cambiarlo, de 1 a 100, antes de iniciar. Se congela al arrancar la partida, se decide al cerrar y queda en `Respuesta.puntos`, `Participante.puntaje` y `Participante.aciertos`. Si empatan en puntos, el podio ordena por el tiempo acumulado de los aciertos (`Participante.tiempoMs`, menor primero). El resultado final repite esos números y agrega `incorrectas`.
 
 Para pintar la clasificación, `GET /resultados/:codigo` ya entrega los participantes ordenados por puntaje, aciertos y nombre. El historial es `GET /resultados`. No hace falta volver a sumar en el cliente; si se reordena, el mismo criterio está en `ordenarClasificacion`.
 

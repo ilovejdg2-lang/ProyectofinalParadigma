@@ -5,6 +5,7 @@ import { AutenticacionModule } from './autenticacion/autenticacion.module';
 import { BancoPreguntasModule } from './banco-preguntas/banco-preguntas.module';
 import { FiltroErrores } from './comun/filtro-errores';
 import { tuboValidacion } from './comun/tubo-validacion';
+import { CursosModule } from './cursos/cursos.module';
 import { CuestionariosModule } from './cuestionarios/cuestionarios.module';
 import { ImagenesModule } from './imagenes/imagenes.module';
 import { PreguntasModule } from './preguntas/preguntas.module';
@@ -20,6 +21,7 @@ import { SesionesJuegoModule } from './sesiones-juego/sesiones-juego.module';
     AutenticacionModule,
     BancoPreguntasModule,
     CuestionariosModule,
+    CursosModule,
     PreguntasModule,
     ImagenesModule,
     SesionesJuegoModule,

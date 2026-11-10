@@ -10,7 +10,7 @@ COPY prisma ./prisma/
 
 # El lockfile lo resolvió npm 11. npm 10 (el que trae node:22-alpine)
 # rechaza el peer opcional anidado de webpack con "Missing from lock file".
-RUN npm install -g npm@11.21.2 && npm ci
+RUN --mount=type=cache,target=/root/.npm npm install -g npm@11.21.2 && npm ci --no-audit --no-fund
 
 COPY src ./src
 RUN npx prisma generate

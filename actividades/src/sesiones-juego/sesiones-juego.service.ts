@@ -12,7 +12,9 @@ import { Prisma } from '../generated/prisma/client';
 import { IdentidadExterna } from '../autenticacion/identidad-externa';
 import { PrismaService } from '../prisma/prisma.service';
 import { AvisoSesiones, CambioSesion } from './aviso-sesiones';
-import { esAcierto, plazoVencido, puntosDeRespuesta } from './calificacion';
+import { esAcierto, plazoVencido, puntosDeRespuesta, puntosPorAciertoDe } from './calificacion';
+import { CURSO_POR_DEFECTO } from '../cursos/curso-predeterminado';
+import { aciertosAcademicos, aportePorcentual, notaDeAciertos } from './nota-academica';
 import { codigoSala } from './codigo-sala';
 import {
   FilaPregunta,
@@ -21,6 +23,7 @@ import {
   instantaneaDe,
   leerInstantanea,
   MILISEGUNDOS_CUENTA,
+  puntosDeSala,
   PreguntaInstantanea,
   presentarSala,
   SalaPublica,
@@ -75,8 +78,10 @@ export class SesionesJuegoService implements OnModuleDestroy {
   async crear(
     cuestionarioId: string,
     identidad: IdentidadExterna,
+    config?: ConfiguracionAcademica,
   ): Promise<SalaPublica> {
     const cuestionario = await this.cuestionarioJugable(cuestionarioId);
+    const academica = await this.prepararAcademica(config, identidad, cuestionario.titulo);
     for (let intento = 0; intento < INTENTOS_CODIGO; intento += 1) {
       try {
         const creada = await this.db().sesionJuego.create({
@@ -90,6 +95,7 @@ export class SesionesJuegoService implements OnModuleDestroy {
             estado: 'esperando',
             preguntaActual: 0,
             segundos: SEGUNDOS_SALA,
+            ...academica,
           },
           include: arbol,
         });
@@ -167,6 +173,13 @@ export class SesionesJuegoService implements OnModuleDestroy {
       const actual = await this.buscarEn(tx, normalizado);
       if (actual.anfitrionId === identidad.id) {
         return actual;
+      }
+      if (actual.cursoId) {
+        const propioYa = actual.participantes.some((participante) => participante.perfilId === identidad.id);
+        if (!propioYa) {
+          if (actual.cursoId === CURSO_POR_DEFECTO.id) await this.matricularEnPredeterminado(identidad);
+          await this.exigirMatricula(actual.cursoId, identidad.id);
+        }
       }
       const propio = actual.participantes.find(
         (participante) => participante.perfilId === identidad.id,
@@ -260,7 +273,11 @@ export class SesionesJuegoService implements OnModuleDestroy {
       const segundos = segundosDe(base.preguntas[0]);
       const iniciadaEn = new Date();
       const abreEn = new Date(iniciadaEn.getTime() + MILISEGUNDOS_CUENTA);
-      const instantanea = { ...base, abreEn: abreEn.toISOString() };
+      const instantanea = {
+        ...base,
+        abreEn: abreEn.toISOString(),
+        puntosPorAcierto: puntosPorAciertoDe(actual.cuestionario?.puntosPorAcierto),
+      };
       const cambio = await tx.sesionJuego.updateMany({
         where: { id: actual.id, estado: 'esperando' },
         data: {
@@ -650,22 +667,24 @@ export class SesionesJuegoService implements OnModuleDestroy {
       : fila.cierraEn
         ? new Date(fila.cierraEn).getTime() - limite
         : Date.now();
+    const valorAcierto = puntosDeSala(fila);
+    const rapidez = new Map<string, number>();
     for (const respuesta of deLaPregunta) {
       if (respuesta.puntos > 0) continue;
+      const puntos = puntosDeRespuesta(esAcierto(pregunta, respuesta), valorAcierto);
+      if (puntos === 0) continue;
       const transcurrido = Math.max(
         0,
         new Date(respuesta.respondidaEn ?? inicio).getTime() - inicio,
       );
-      const puntos = puntosDeRespuesta(
-        esAcierto(pregunta, respuesta),
-        transcurrido,
-        limite,
-      );
-      if (puntos === 0) continue;
       await tx.respuesta.update({
         where: { id: respuesta.id },
         data: { puntos },
       });
+      rapidez.set(
+        respuesta.participanteId,
+        (rapidez.get(respuesta.participanteId) ?? 0) + transcurrido,
+      );
     }
     for (const participante of fila.participantes) {
       const suyas = await tx.respuesta.findMany({
@@ -675,7 +694,11 @@ export class SesionesJuegoService implements OnModuleDestroy {
       const aciertos = suyas.filter((item) => item.puntos > 0).length;
       await tx.participante.update({
         where: { id: participante.id },
-        data: { puntaje, aciertos },
+        data: {
+          puntaje,
+          aciertos,
+          tiempoMs: (participante.tiempoMs ?? 0) + (rapidez.get(participante.id) ?? 0),
+        },
       });
     }
   }
@@ -708,6 +731,153 @@ export class SesionesJuegoService implements OnModuleDestroy {
         finalizadoEn: finalizadaEn,
       })),
     });
+    if (fila.modoAcademico === 'evaluacion') {
+      await this.escribirNotas(tx, fila, jugadas);
+    }
+  }
+
+  private async prepararAcademica(
+    config: ConfiguracionAcademica | undefined,
+    identidad: IdentidadExterna,
+    tituloCuestionario: string,
+  ) {
+    const modo = config?.modo ?? 'practica';
+    if (modo === 'practica' && !config?.cursoId) {
+      return {
+        modoAcademico: 'practica',
+        cursoId: null,
+        cursoNombre: null,
+        nombreEvaluacion: null,
+        notaMaxima: 100,
+        valorPorcentaje: 0,
+        notaMinima: 70,
+      };
+    }
+    if (!config?.cursoId) {
+      throw new BadRequestException({ mensaje: 'Elige el curso de la evaluación.' });
+    }
+    const curso = await this.cursoDelDocente(config.cursoId, identidad.id);
+    const notaMaxima = config.notaMaxima ?? 100;
+    const valorPorcentaje = config.valorPorcentaje ?? (modo === 'evaluacion' ? 10 : 0);
+    const notaMinima = config.notaMinima ?? 70;
+    if (modo === 'evaluacion' && !(valorPorcentaje >= 1 && valorPorcentaje <= 100)) {
+      throw new BadRequestException({ mensaje: 'Indica qué porcentaje de la nota del curso representa la evaluación.' });
+    }
+    if (notaMinima > notaMaxima) {
+      throw new BadRequestException({ mensaje: 'La nota mínima no puede superar la nota máxima.' });
+    }
+    const nombre = config.nombreEvaluacion?.trim();
+    return {
+      modoAcademico: modo,
+      cursoId: curso.id,
+      cursoNombre: curso.nombre,
+      nombreEvaluacion: modo === 'evaluacion' ? nombre || tituloCuestionario : null,
+      notaMaxima,
+      valorPorcentaje: modo === 'evaluacion' ? valorPorcentaje : 0,
+      notaMinima,
+    };
+  }
+
+  private async cursoDelDocente(cursoId: string, docenteId: string) {
+    const cliente = this.prisma.obtener() as unknown as ClienteAcademico;
+    if (!cliente.curso) {
+      throw new ServiceUnavailableException({ mensaje: 'Los cursos no están disponibles.' });
+    }
+    const curso = await cliente.curso.findFirst({ where: { id: cursoId, docenteId } });
+    if (!curso) {
+      throw new ForbiddenException({ mensaje: 'Ese curso no está asignado a tu cuenta.' });
+    }
+    return curso;
+  }
+
+  private async exigirMatricula(cursoId: string, estudianteId: string) {
+    const cliente = this.prisma.obtener() as unknown as ClienteAcademico;
+    if (!cliente.matricula) {
+      throw new ForbiddenException({ mensaje: 'Solo un estudiante matriculado puede entrar a esta evaluación.' });
+    }
+    const fila = await cliente.matricula.findFirst({ where: { cursoId, estudianteId } });
+    if (!fila) {
+      throw new ForbiddenException({ mensaje: 'Solo quien pertenece a este curso puede entrar a la partida.' });
+    }
+  }
+
+  private async matricularEnPredeterminado(identidad: IdentidadExterna) {
+    const cliente = this.prisma.obtener() as unknown as ClienteAcademico;
+    if (!cliente.curso?.upsert || !cliente.matricula?.upsert) return;
+    await cliente.curso.upsert({
+      where: { id: CURSO_POR_DEFECTO.id },
+      update: {},
+      create: {
+        id: CURSO_POR_DEFECTO.id,
+        nombre: CURSO_POR_DEFECTO.nombre,
+        docenteId: CURSO_POR_DEFECTO.docenteId,
+      },
+    });
+    const nombre = identidad.nombre.trim().slice(0, 80) || 'Estudiante';
+    await cliente.matricula.upsert({
+      where: {
+        cursoId_estudianteId: { cursoId: CURSO_POR_DEFECTO.id, estudianteId: identidad.id },
+      },
+      update: { nombre },
+      create: {
+        id: randomUUID(),
+        cursoId: CURSO_POR_DEFECTO.id,
+        estudianteId: identidad.id,
+        nombre,
+      },
+    });
+  }
+
+  private async escribirNotas(tx: ClienteSesion, fila: FilaSesion, jugadas: number) {
+    const notas = (tx as ClienteSesion & { calificacion?: ClienteNotas }).calificacion;
+    const academico = this.prisma.obtener() as unknown as ClienteAcademico;
+    if (!notas || !fila.cursoId) return;
+    const existentes = await notas.count({ where: { sesionId: fila.id } });
+    if (existentes > 0) return;
+    const matriculas = new Set(await this.idsMatriculados(academico, fila.cursoId));
+    const preguntas = leerInstantanea(fila.preguntasInstantanea)?.preguntas ?? [];
+    const total = preguntas.length || jugadas;
+    const notaMaxima = fila.notaMaxima ?? 100;
+    const valor = fila.valorPorcentaje ?? 0;
+    const filas = fila.participantes
+      .filter((participante) => matriculas.has(participante.perfilId))
+      .map((participante) => {
+        const aciertos = aciertosAcademicos(preguntas, participante.respuestas ?? []);
+        const nota = notaDeAciertos(aciertos, total, notaMaxima);
+        return {
+          participante,
+          aciertos,
+          nota,
+          aporte: aportePorcentual(nota, notaMaxima, valor),
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.participante.puntaje - a.participante.puntaje ||
+          b.aciertos - a.aciertos ||
+          a.participante.nombre.localeCompare(b.participante.nombre),
+      );
+    if (filas.length === 0) return;
+    await notas.createMany({
+      data: filas.map((item, indice) => ({
+        id: randomUUID(),
+        sesionId: fila.id,
+        estudianteId: item.participante.perfilId,
+        nombre: item.participante.nombre,
+        aciertos: item.aciertos,
+        total,
+        nota: item.nota,
+        aporte: item.aporte,
+        posicion: indice + 1,
+        puntaje: item.participante.puntaje,
+      })),
+    });
+  }
+
+  private async idsMatriculados(cliente: ClienteAcademico, cursoId: string) {
+    if (!cliente.matricula?.findMany) return [];
+    const filas = await cliente.matricula.findMany({ where: { cursoId } });
+    return filas.map((fila) => fila.estudianteId);
   }
 
   private db(): ClienteSesion {
@@ -729,6 +899,53 @@ export class SesionesJuegoService implements OnModuleDestroy {
   }
 }
 
+export interface ConfiguracionAcademica {
+  modo?: 'practica' | 'evaluacion';
+  cursoId?: string;
+  nombreEvaluacion?: string;
+  notaMaxima?: number;
+  valorPorcentaje?: number;
+  notaMinima?: number;
+}
+
+interface ClienteAcademico {
+  curso?: {
+    findFirst(args: { where: { id: string; docenteId: string } }): Promise<{ id: string; nombre: string } | null>;
+    upsert?(args: {
+      where: { id: string };
+      update: Record<string, never>;
+      create: { id: string; nombre: string; docenteId: string };
+    }): Promise<{ id: string; nombre: string }>;
+  };
+  matricula?: {
+    findFirst(args: { where: { cursoId: string; estudianteId: string } }): Promise<{ estudianteId: string } | null>;
+    findMany?(args: { where: { cursoId: string } }): Promise<Array<{ estudianteId: string }>>;
+    upsert?(args: {
+      where: { cursoId_estudianteId: { cursoId: string; estudianteId: string } };
+      update: { nombre: string };
+      create: { id: string; cursoId: string; estudianteId: string; nombre: string };
+    }): Promise<unknown>;
+  };
+}
+
+interface ClienteNotas {
+  count(args: { where: { sesionId: string } }): Promise<number>;
+  createMany(args: {
+    data: Array<{
+      id: string;
+      sesionId: string;
+      estudianteId: string;
+      nombre: string;
+      aciertos: number;
+      total: number;
+      nota: number;
+      aporte: number;
+      posicion: number;
+      puntaje: number;
+    }>;
+  }): Promise<unknown>;
+}
+
 interface ClienteSesion {
   cuestionario: {
     findFirst(args: {
@@ -748,6 +965,13 @@ interface ClienteSesion {
         estado: 'esperando';
         preguntaActual: number;
         segundos: number;
+        modoAcademico?: string;
+        cursoId?: string | null;
+        cursoNombre?: string | null;
+        nombreEvaluacion?: string | null;
+        notaMaxima?: number;
+        valorPorcentaje?: number;
+        notaMinima?: number;
       };
       include: typeof arbol;
     }): Promise<FilaSesion & { id: string; codigo: string }>;
@@ -794,6 +1018,7 @@ interface ClienteSesion {
         conectado?: boolean;
         puntaje?: number;
         aciertos?: number;
+        tiempoMs?: number;
       };
     }): Promise<unknown>;
     updateMany(args: {

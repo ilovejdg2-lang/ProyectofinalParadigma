@@ -123,6 +123,13 @@ export class EntradaCuestionarioDto {
   @IsString()
   imagenUrl?: string;
 
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  puntosPorAcierto?: number;
+
   @ApiProperty({ type: () => PreguntaDto, isArray: true })
   @IsArray()
   @ValidateNested({ each: true })

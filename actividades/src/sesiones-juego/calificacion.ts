@@ -14,20 +14,19 @@ export function plazoVencido(
   return ahora.getTime() > new Date(cierraEn).getTime();
 }
 
-/** 500 por acertar y hasta 500 más por responder antes de que se agote el plazo. */
+/** Un acierto vale los puntos del cuestionario. Por defecto es 1. El error vale 0. */
+export function puntosPorAciertoDe(valor: unknown): number {
+  const numero = typeof valor === 'number' ? valor : Number(valor);
+  if (!Number.isInteger(numero) || numero < 1) return 1;
+  return Math.min(100, numero);
+}
+
 export function puntosDeRespuesta(
   acierto: boolean,
-  transcurridoMs: number,
-  limiteMs: number,
+  puntosPorAcierto: unknown = 1,
 ): number {
   if (!acierto) return 0;
-  if (!(limiteMs > 0)) return 500;
-  const razon = Math.min(
-    1,
-    Math.max(0, transcurridoMs / limiteMs),
-  );
-  const bruto = 500 + 500 * (1 - razon);
-  return Math.min(1000, Math.max(500, Math.round(bruto)));
+  return puntosPorAciertoDe(puntosPorAcierto);
 }
 
 export function esAcierto(

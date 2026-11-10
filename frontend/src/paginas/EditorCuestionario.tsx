@@ -9,13 +9,25 @@ import { validarCuestionario } from '../dominio/validacion.ts'
 
 const categorias = ['Kanban', 'Paradigma funcional', 'Paradigma lógico', 'Orientado a objetos', 'Concurrente', 'General']
 
-function preguntaVacia(): BorradorPregunta {
+function esVerdaderoFalso(opciones: Array<{ texto: string }>) {
+  if (opciones.length !== 2) return false
+  const textos = opciones.map((opcion) => opcion.texto.trim().toLowerCase())
+  return textos.includes('verdadero') && textos.includes('falso')
+}
+
+function preguntaVerdaderoFalso(): BorradorPregunta {
+  const verdadero = crypto.randomUUID()
+  const falso = crypto.randomUUID()
   return {
     id: crypto.randomUUID(),
     enunciado: '',
-    respuestaCorrecta: null,
-    opciones: [1, 2, 3, 4].map(() => ({ id: crypto.randomUUID(), texto: '' })),
-    opcionCorrectaId: null,
+    respuestaCorrecta: true,
+    tipo: 'vf',
+    opciones: [
+      { id: verdadero, texto: 'Verdadero' },
+      { id: falso, texto: 'Falso' },
+    ],
+    opcionCorrectaId: verdadero,
     imagenSimulada: false,
     segundos: 20,
   }
@@ -76,7 +88,8 @@ function borradorVacio(): BorradorCuestionario {
     etiquetas: '',
     dificultad: 'medio',
     imagenSimulada: false,
-    preguntas: [preguntaVacia()],
+    puntosPorAcierto: 1,
+    preguntas: [preguntaVerdaderoFalso()],
   }
 }
 
@@ -125,10 +138,17 @@ export function EditorCuestionario() {
           dificultad: cuestionario.dificultad,
           imagenUrl: cuestionario.imagenUrl,
           imagenSimulada: false,
+          puntosPorAcierto: cuestionario.puntosPorAcierto ?? 1,
           preguntas: cuestionario.preguntas.map((pregunta) => ({
             id: pregunta.id,
             enunciado: pregunta.enunciado,
-            respuestaCorrecta: pregunta.respuestaCorrecta,
+            respuestaCorrecta: pregunta.respuestaCorrecta ?? null,
+            tipo: esVerdaderoFalso(pregunta.opciones ?? [
+              { texto: 'Verdadero' },
+              { texto: 'Falso' },
+            ])
+              ? 'vf' as const
+              : 'opciones' as const,
             opciones: pregunta.opciones?.map((opcion) => ({ id: opcion.id, texto: opcion.texto })) ?? [
               { id: `${pregunta.id}:verdadero`, texto: 'Verdadero' },
               { id: `${pregunta.id}:falso`, texto: 'Falso' },
@@ -259,7 +279,7 @@ export function EditorCuestionario() {
   }
 
   function agregarPregunta() {
-    const nueva = preguntaVacia()
+    const nueva = preguntaVerdaderoFalso()
     actualizar({ preguntas: [...borrador.preguntas, nueva] })
     setPreguntaAbierta(nueva.id)
   }
@@ -281,6 +301,7 @@ export function EditorCuestionario() {
           .filter(Boolean),
         dificultad: borrador.dificultad,
         imagenUrl: borrador.imagenUrl,
+        puntosPorAcierto: borrador.puntosPorAcierto,
         preguntas: borrador.preguntas.map((pregunta, indice) => ({
           id: pregunta.id,
           enunciado: pregunta.enunciado.trim(),
@@ -438,6 +459,18 @@ export function EditorCuestionario() {
               </label>
             </div>
             <label className="campo-grupo">
+              <span>Puntos por acierto</span>
+              <input
+                className="campo"
+                type="number"
+                min={1}
+                max={100}
+                value={borrador.puntosPorAcierto}
+                onChange={(evento) => actualizar({ puntosPorAcierto: Math.min(100, Math.max(1, Number(evento.target.value) || 1)) })}
+              />
+              <small>Por defecto es 1. Un error o una respuesta que no llega valen 0. El podio desempata por rapidez.</small>
+            </label>
+            <label className="campo-grupo">
               <span>Etiquetas, separadas por coma</span>
               <input className="campo" value={borrador.etiquetas} onChange={(evento) => actualizar({ etiquetas: evento.target.value })} />
             </label>
@@ -498,6 +531,30 @@ export function EditorCuestionario() {
                       onChange={(evento) => actualizarPregunta(pregunta.id, { segundos: Number(evento.target.value) })}
                     />
                   </label>
+                  <div className="tipos-pregunta" role="group" aria-label={`Tipo de la pregunta ${indice + 1}`}>
+                    <button
+                      type="button"
+                      aria-pressed={pregunta.tipo === 'vf'}
+                      onClick={() => actualizarPregunta(pregunta.id, preguntaVerdaderoFalsoConservando(pregunta))}
+                    >
+                      Verdadero o falso
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={pregunta.tipo === 'opciones'}
+                      onClick={() => {
+                        if (pregunta.tipo === 'opciones') return
+                        actualizarPregunta(pregunta.id, {
+                          tipo: 'opciones',
+                          opciones: [1, 2, 3, 4].map(() => ({ id: crypto.randomUUID(), texto: '' })),
+                          opcionCorrectaId: null,
+                          respuestaCorrecta: null,
+                        })
+                      }}
+                    >
+                      Varias opciones
+                    </button>
+                  </div>
                   <div className="respuestas-editor" role="radiogroup" aria-label={`Respuesta correcta de la pregunta ${indice + 1}`}>
                     {pregunta.opciones.map((opcion, numero) => (
                       <div
@@ -508,6 +565,7 @@ export function EditorCuestionario() {
                           aria-label={`Respuesta ${numero + 1} de la pregunta ${indice + 1}`}
                           placeholder={`Respuesta ${numero + 1}`}
                           value={opcion.texto}
+                          readOnly={pregunta.tipo === 'vf'}
                           onChange={(evento) => cambiarOpcion(pregunta.id, opcion.id, evento.target.value)}
                         />
                         <button
@@ -516,7 +574,7 @@ export function EditorCuestionario() {
                         >
                           {pregunta.opcionCorrectaId === opcion.id ? 'Correcta' : 'Marcar'}
                         </button>
-                        {pregunta.opciones.length > 2 ? (
+                        {pregunta.tipo === 'opciones' && pregunta.opciones.length > 2 ? (
                           <button type="button" aria-label={`Quitar respuesta ${numero + 1}`} onClick={() => quitarOpcion(pregunta.id, opcion.id)}>
                             Quitar
                           </button>
@@ -524,14 +582,16 @@ export function EditorCuestionario() {
                       </div>
                     ))}
                   </div>
-                  <button
-                    className="boton"
-                    type="button"
-                    disabled={pregunta.opciones.length >= 6}
-                    onClick={() => agregarOpcion(pregunta.id)}
-                  >
-                    Agregar respuesta
-                  </button>
+                  {pregunta.tipo === 'opciones' ? (
+                    <button
+                      className="boton"
+                      type="button"
+                      disabled={pregunta.opciones.length >= 6}
+                      onClick={() => agregarOpcion(pregunta.id)}
+                    >
+                      Agregar respuesta
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : null,
@@ -583,6 +643,22 @@ export function EditorCuestionario() {
       />
     </form>
   )
+}
+
+function preguntaVerdaderoFalsoConservando(pregunta: BorradorPregunta): Partial<BorradorPregunta> {
+  const verdadero = crypto.randomUUID()
+  const falso = crypto.randomUUID()
+  const marcada = pregunta.opciones.find((opcion) => opcion.id === pregunta.opcionCorrectaId)?.texto.trim().toLowerCase()
+  const esFalso = marcada === 'falso'
+  return {
+    tipo: 'vf',
+    opciones: [
+      { id: verdadero, texto: 'Verdadero' },
+      { id: falso, texto: 'Falso' },
+    ],
+    opcionCorrectaId: esFalso ? falso : verdadero,
+    respuestaCorrecta: !esFalso,
+  }
 }
 
 function IconoLapiz() {

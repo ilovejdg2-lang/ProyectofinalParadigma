@@ -117,7 +117,7 @@ describe('Partidas y resultados (e2e)', () => {
       .send({})
       .expect(409)
       .expect({ mensaje: 'No hay una pregunta abierta.' });
-    expect(trasRespuesta.participantes[0].puntaje).toBeGreaterThanOrEqual(500);
+    expect(trasRespuesta.participantes[0].puntaje).toBe(1);
     expect(trasRespuesta.preguntas[1].enunciado).toBe('');
 
     await http
@@ -179,7 +179,7 @@ describe('Partidas y resultados (e2e)', () => {
       perfilId: 'luis',
       aciertos: 1,
     });
-    expect(cuerpo.participantes[0].puntaje).toBeGreaterThanOrEqual(500);
+    expect(cuerpo.participantes[0].puntaje).toBe(1);
 
     const historial = await http
       .get('/resultados')

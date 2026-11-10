@@ -52,6 +52,19 @@ if (-not $env:LOCAL_GRAFANA_PORT) {
   $env:LOCAL_GRAFANA_PORT = Elegir-Puerto 3000, 3011, 3020, 3021, 3022
 }
 
+if (-not $env:PUBLIC_API_URL) {
+  $conSalida = @(Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+    Where-Object { $_.IPv4DefaultGateway -and $_.IPv4Address })
+  $deSalida = @($conSalida | ForEach-Object { $_.IPv4Address } |
+    Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' })
+  $lan = ($deSalida | Where-Object { $_.IPAddress -like '192.168.*' } | Select-Object -First 1).IPAddress
+  if (-not $lan) { $lan = ($deSalida | Where-Object { $_.IPAddress -like '10.*' } | Select-Object -First 1).IPAddress }
+  if (-not $lan) { $lan = ($deSalida | Select-Object -First 1).IPAddress }
+  if (-not $lan) { $lan = '127.0.0.1' }
+  $env:PUBLIC_API_URL = "http://${lan}:5002"
+}
+$env:DOCKER_BUILDKIT = '1'
+
 $compose = @('--env-file', $envFile, '-f', 'docker-compose.local.yml')
 
 function Invoke-Compose {
@@ -75,5 +88,6 @@ Write-Host "Frontend:     http://127.0.0.1:$($env:LOCAL_FRONTEND_PORT)"
 Write-Host "Autenticación: http://127.0.0.1:5001/health/ready"
 Write-Host "Actividades:  http://127.0.0.1:5002/salud"
 Write-Host "PostgreSQL:   127.0.0.1:54329"
+Write-Host "Imágenes:     $($env:PUBLIC_API_URL)/archivos/"
 Write-Host "Grafana:      http://127.0.0.1:$($env:LOCAL_GRAFANA_PORT)"
 Write-Host "Para detener: scripts/detener.ps1"

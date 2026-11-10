@@ -50,8 +50,11 @@ services:
       - AUTH_JWKS_URL=http://auth-service:5001/.well-known/jwks.json
       - JWT_AUDIENCE=profelink-actividades
       - NODE_EXTRA_CA_CERTS=/app/certs/supabase-root.crt
+      - ALMACEN_IMAGENES_DIR=/app/almacen-imagenes
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://127.0.0.1:5002}
     volumes:
       - ./autenticacion/certs/supabase-root.crt:/app/certs/supabase-root.crt:ro
+      - actividades-imagenes:/app/almacen-imagenes
     depends_on:
       auth-service:
         condition: service_healthy
@@ -65,3 +68,5 @@ services:
 volumes:
   auth-keys:
     name: profelink-auth-keys
+  actividades-imagenes:
+    name: profelink-actividades-imagenes

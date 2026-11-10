@@ -29,7 +29,7 @@ export function Inicio() {
         {esDocente ? (
           <article className="panel tarjeta-inicio acento-naranja">
             <h2>Crear</h2>
-            <p className="meta">Arma preguntas con cuatro respuestas, como en Kahoot, y adjunta una imagen si la necesitas.</p>
+            <p className="meta">Arma preguntas de verdadero o falso, o con varias respuestas, y adjunta una imagen si la necesitas.</p>
             <Link className="boton" to="/cuestionarios/nuevo">
               Nuevo cuestionario
             </Link>

@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Perfil, Sesion } from '../dominio/tipos.ts'
+import { limpiarEspacio } from '../paginas/espacio.ts'
+import { entrarAlCursoPredeterminado } from '../servicios/cursos.ts'
 import { useServicios } from './ProveedorServicios.tsx'
 
 const CLAVE_TOKEN = 'profelink.token'
@@ -37,6 +39,7 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
         }
         setPerfil(sesion.perfil)
         setToken(sesion.token)
+        void entrarAlCursoPredeterminado(sesion.token)
       })
       .catch(() => {
         if (!activo) return
@@ -60,8 +63,10 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
       sessionStorage.setItem(CLAVE_TOKEN, sesion.token)
       setToken(sesion.token)
       setPerfil(sesion.perfil)
+      void entrarAlCursoPredeterminado(sesion.token)
     },
     async salir() {
+      limpiarEspacio()
       if (token) await autenticacion.cerrarSesion(token)
       sessionStorage.removeItem(CLAVE_TOKEN)
       setToken(null)

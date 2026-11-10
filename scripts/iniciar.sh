@@ -32,6 +32,13 @@ set -a
 source "$ENV_FILE"
 set +a
 
+if [[ -z "${PUBLIC_API_URL:-}" ]]; then
+  LAN="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  if [[ -z "$LAN" ]]; then LAN="127.0.0.1"; fi
+  export PUBLIC_API_URL="http://${LAN}:5002"
+fi
+export DOCKER_BUILDKIT=1
+
 echo "Levantando PostgreSQL local..."
 docker compose --env-file "$ENV_FILE" -f docker-compose.local.yml up -d postgres
 
@@ -39,15 +46,17 @@ echo "Aplicando migraciones de autenticación y actividades..."
 docker compose --env-file "$ENV_FILE" -f docker-compose.local.yml --profile preparar run --rm --build preparar-auth
 docker compose --env-file "$ENV_FILE" -f docker-compose.local.yml --profile preparar run --rm --build preparar-actividades
 
-echo "Construyendo auth-service, actividades y frontend..."
-docker compose --env-file "$ENV_FILE" -f docker-compose.local.yml up -d --build auth-service actividades frontend
+echo "Construyendo auth-service, actividades, frontend y Grafana..."
+docker compose --env-file "$ENV_FILE" -f docker-compose.local.yml up -d --build otel-lgtm auth-service actividades frontend
 
-cat <<'EOF'
+cat <<EOF
 
-Frontend:      http://localhost:5173
-Autenticación: http://localhost:5001/health/ready
-Actividades:   http://localhost:5002/salud
+Frontend:      http://127.0.0.1:\${LOCAL_FRONTEND_PORT:-5173}
+Autenticación: http://127.0.0.1:5001/health/ready
+Actividades:   http://127.0.0.1:5002/salud
 PostgreSQL:    127.0.0.1:54329
+Imágenes:      \${PUBLIC_API_URL}/archivos/
+Grafana:       http://127.0.0.1:\${LOCAL_GRAFANA_PORT:-3000}
 Para detener:  scripts/detener.sh
 Las cuentas de demostración no se imprimen aquí. Pedilas por el canal privado del equipo.
 EOF

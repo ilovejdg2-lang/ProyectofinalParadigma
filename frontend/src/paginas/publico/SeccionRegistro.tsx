@@ -10,6 +10,7 @@ import {
   validarRegistroLanding,
 } from './registro.ts'
 import { useRevelar } from './revelar.ts'
+import { limpiarEspacio } from '../espacio.ts'
 
 export function SeccionRegistro() {
   const { autenticacion } = useServicios()
@@ -53,8 +54,9 @@ export function SeccionRegistro() {
       const reduce =
         typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
       if (!reduce) await new Promise((resolver) => window.setTimeout(resolver, 400))
+      limpiarEspacio()
       entrar(sesion)
-      navegar('/', { replace: true })
+      navegar('/elegir', { replace: true })
     } catch (error) {
       setErrorServicio(mensajeDe(error))
     } finally {

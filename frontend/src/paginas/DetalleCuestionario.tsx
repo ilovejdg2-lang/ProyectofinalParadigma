@@ -4,9 +4,9 @@ import { EstadoCarga, EstadoError } from '../componentes/Interfaz.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
 import { mensajeDe } from '../dominio/errores.ts'
-import { prepararPestanaSala, publicarSala } from '../juego/abrirSala.ts'
 import { acentoDeDificultad, etiquetaDificultad } from '../dominio/filtros.ts'
-import type { Cuestionario, ModoJuego, OpcionRespuesta, Pregunta } from '../dominio/tipos.ts'
+import type { Cuestionario, ModoJuego } from '../dominio/tipos.ts'
+import { OpcionesJuego } from '../juego/OpcionesJuego.tsx'
 
 const etiquetasModo: Record<ModoJuego, string> = {
   'en-vivo': 'En vivo',
@@ -15,25 +15,15 @@ const etiquetasModo: Record<ModoJuego, string> = {
   desafio: 'Desafío',
 }
 
-function opcionesDePregunta(pregunta: Pregunta): OpcionRespuesta[] {
-  if (pregunta.opciones && pregunta.opciones.length >= 2) return pregunta.opciones
-  return [
-    { id: `${pregunta.id}:verdadero`, texto: 'Verdadero', correcta: pregunta.respuestaCorrecta },
-    { id: `${pregunta.id}:falso`, texto: 'Falso', correcta: !pregunta.respuestaCorrecta },
-  ]
-}
-
 export function DetalleCuestionario() {
   const { id = '' } = useParams()
-  const { actividades, sala } = useServicios()
+  const { actividades } = useServicios()
   const { token, perfil } = useAutenticacion()
   const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
   const navegar = useNavigate()
   const [cuestionario, setCuestionario] = useState<Cuestionario | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
-  const [abriendo, setAbriendo] = useState(false)
-  const [enlaceManual, setEnlaceManual] = useState<string | null>(null)
   const [practicando, setPracticando] = useState(false)
   const [modoSeleccionado, setModoSeleccionado] = useState<ModoJuego>('practica')
   const [selecciones, setSelecciones] = useState<Record<string, string>>({})
@@ -59,23 +49,6 @@ export function DetalleCuestionario() {
       activo = false
     }
   }, [actividades, id])
-
-  async function iniciar() {
-    if (!token) return
-    const ventana = prepararPestanaSala()
-    setAbriendo(true)
-    setEnlaceManual(null)
-    try {
-      const creada = await sala.crear(token, id)
-      const publicada = publicarSala(ventana, creada.codigo)
-      if (!publicada.abierta) setEnlaceManual(publicada.url)
-    } catch (err) {
-      if (ventana && !ventana.closed) ventana.close()
-      setError(mensajeDe(err))
-    } finally {
-      setAbriendo(false)
-    }
-  }
 
   function elegirOpcion(preguntaId: string, opcionId: string) {
     setSelecciones((actual) => ({ ...actual, [preguntaId]: opcionId }))
@@ -133,18 +106,10 @@ export function DetalleCuestionario() {
         {cuestionario.esDemostracion ? <p className="etiqueta-demo">Datos de prueba</p> : null}
         <p>{cuestionario.descripcion || 'Este cuestionario no tiene descripción.'}</p>
         {error ? <p className="error-texto">{error}</p> : null}
-        {enlaceManual ? (
-          <p>
-            El navegador bloqueó la pestaña nueva.{' '}
-            <a href={enlaceManual} target="_blank" rel="noreferrer">
-              Abrir la sala
-            </a>
-          </p>
-        ) : null}
         {esDocente ? (
-          <button className="conjunto-anfitrion" type="button" onClick={() => void iniciar()} disabled={abriendo}>
-            {abriendo ? 'Abriendo…' : 'Juego anfitrión'}
-          </button>
+          <Link className="conjunto-anfitrion" to={`/cuestionarios/${cuestionario.id}/configurar`}>
+            Configurar sesión
+          </Link>
         ) : (
           <Link className="conjunto-anfitrion" to="/unirse" style={{ textAlign: 'center', textDecoration: 'none' }}>
             Unirse a partida con código
@@ -171,7 +136,6 @@ export function DetalleCuestionario() {
       </aside>
       <div className="vista-preguntas">
         {cuestionario.preguntas.map((pregunta, indice) => {
-          const opciones = opcionesDePregunta(pregunta)
           const elegida = selecciones[pregunta.id]
           return (
             <article className="vista-pregunta" key={pregunta.id}>
@@ -179,18 +143,11 @@ export function DetalleCuestionario() {
                 <strong>Pregunta {indice + 1}</strong>
                 <p>{pregunta.enunciado}</p>
                 {practicando ? (
-                  <div className="fila" role="group" aria-label={`Opciones de la pregunta ${indice + 1}`}>
-                    {opciones.map((opcion) => (
-                      <button
-                        key={opcion.id}
-                        type="button"
-                        className={elegida === opcion.id ? 'boton' : 'boton-fantasma'}
-                        onClick={() => elegirOpcion(pregunta.id, opcion.id)}
-                      >
-                        {opcion.texto}
-                      </button>
-                    ))}
-                  </div>
+                  <OpcionesJuego
+                    pregunta={pregunta}
+                    elegida={elegida}
+                    onElegir={(opcionId) => elegirOpcion(pregunta.id, opcionId)}
+                  />
                 ) : null}
                 {practicando && elegida && pregunta.explicacion ? (
                   <p className="meta">{pregunta.explicacion}</p>

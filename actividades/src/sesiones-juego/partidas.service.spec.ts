@@ -207,8 +207,7 @@ describe('respuestas, cierre y resultados', () => {
       (item) => item.perfilId === 'marta',
     );
     expect(luisSala?.aciertos).toBe(1);
-    expect(luisSala?.puntaje).toBeGreaterThanOrEqual(500);
-    expect(luisSala?.puntaje).toBeLessThanOrEqual(1000);
+    expect(luisSala?.puntaje).toBe(1);
     expect(luisSala?.respuestas[0].puntos).toBe(luisSala?.puntaje);
     expect(luisSala?.respuestas[0].opcionId).toBe('p1a');
     expect(martaSala).toMatchObject({ puntaje: 0, aciertos: 0 });
@@ -224,7 +223,7 @@ describe('respuestas, cierre y resultados', () => {
     expect(
       memoria.sesiones[0].participantes.find((item) => item.perfilId === 'luis')
         ?.puntaje,
-    ).toBeGreaterThanOrEqual(500);
+    ).toBe(1);
 
     const intruso = await rechazo(servicio.cerrar(codigo, luis));
     expect(intruso).toBeInstanceOf(ForbiddenException);
@@ -263,7 +262,7 @@ describe('respuestas, cierre y resultados', () => {
     expect(memoria.sesiones[0].estado).toBe('cerrada');
     expect(
       memoria.sesiones[0].participantes.every(
-        (item) => item.puntaje >= 500 && item.puntaje <= 1000,
+        (item) => item.puntaje === 1,
       ),
     ).toBe(true);
   });
@@ -309,7 +308,7 @@ describe('respuestas, cierre y resultados', () => {
     ]);
     expect(
       cerrada.participantes.find((item) => item.perfilId === 'luis')?.puntaje,
-    ).toBeGreaterThanOrEqual(500);
+    ).toBe(1);
   });
 
   it('avanza una sola pregunta, renueva el plazo y no muestra la solución abierta', async () => {
@@ -388,7 +387,7 @@ describe('respuestas, cierre y resultados', () => {
     expect(avanzada.preguntaActual).toBe(0);
     expect(
       avanzada.participantes.find((item) => item.perfilId === 'luis')?.puntaje,
-    ).toBeGreaterThanOrEqual(500);
+    ).toBe(1);
 
     const siguiente = await servicio.avanzar(codigo, ana);
     expect(siguiente.preguntaActual).toBe(1);
@@ -444,8 +443,7 @@ describe('respuestas, cierre y resultados', () => {
       aciertos: 2,
       incorrectas: 0,
     });
-    expect(deLuis?.puntuacion).toBeGreaterThanOrEqual(1000);
-    expect(deLuis?.puntuacion).toBeLessThanOrEqual(2000);
+    expect(deLuis?.puntuacion).toBe(2);
     const deMarta = memoria.resultados.find((item) => item !== deLuis);
     expect(deMarta).toMatchObject({
       puntuacion: 0,

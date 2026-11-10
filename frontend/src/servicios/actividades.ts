@@ -14,6 +14,7 @@ export interface EntradaCuestionario {
   dificultad: Cuestionario['dificultad']
   modo?: Cuestionario['modo']
   imagenUrl?: string
+  puntosPorAcierto?: number
   preguntas: Pregunta[]
 }
 

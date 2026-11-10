@@ -3,6 +3,12 @@ import type { Pregunta } from '../dominio/tipos.ts'
 
 const simbolos = ['▲', '◆', '●', '■']
 
+function esVerdaderoFalso(opciones: Array<{ texto: string }>) {
+  if (opciones.length !== 2) return false
+  const textos = opciones.map((opcion) => opcion.texto.trim().toLowerCase())
+  return textos.includes('verdadero') && textos.includes('falso')
+}
+
 export function OpcionesJuego({
   pregunta,
   elegida,
@@ -14,10 +20,17 @@ export function OpcionesJuego({
   bloqueada?: boolean
   onElegir?: (opcionId: string) => void
 }) {
+  const opciones = opcionesDe(pregunta)
+  const verdaderoFalso = esVerdaderoFalso(opciones)
   return (
-    <div className="respuestas">
-      {opcionesDe(pregunta).map((opcion, numero) => {
-        const clase = `respuesta tono-${numero % 4}${elegida === opcion.id ? ' elegida' : ''}`
+    <div className={verdaderoFalso ? 'respuestas respuestas-vf' : 'respuestas'}>
+      {opciones.map((opcion, numero) => {
+        const marca = verdaderoFalso
+          ? opcion.texto.trim().toLowerCase() === 'verdadero'
+            ? ' es-verdadero'
+            : ' es-falso'
+          : ''
+        const clase = `respuesta tono-${numero % 4}${marca}${elegida === opcion.id ? ' elegida' : ''}`
         const contenido = (
           <>
             <span className="simbolo" aria-hidden="true">
