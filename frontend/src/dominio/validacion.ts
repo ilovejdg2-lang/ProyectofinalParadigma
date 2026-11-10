@@ -77,6 +77,12 @@ export function validarCuestionario(borrador: BorradorCuestionario): string[] {
         errores.push(`La respuesta ${numero + 1} de la pregunta ${indice + 1} está vacía.`)
       }
     })
+    if (
+      pregunta.segundos !== undefined &&
+      (!Number.isInteger(pregunta.segundos) || pregunta.segundos < 5 || pregunta.segundos > 120)
+    ) {
+      errores.push(`La pregunta ${indice + 1} debe durar entre 5 y 120 segundos.`)
+    }
     if (pregunta.opcionCorrectaId === null && pregunta.respuestaCorrecta === null) {
       errores.push(`Indica la respuesta correcta de la pregunta ${indice + 1}.`)
     }

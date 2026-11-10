@@ -4,6 +4,7 @@ import { Dialogo, EstadoCarga, EstadoError, EstadoVacio } from '../componentes/I
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
 import { mensajeDe } from '../dominio/errores.ts'
+import { prepararPestanaSala, publicarSala } from '../juego/abrirSala.ts'
 import { acentoDeDificultad, etiquetaDificultad } from '../dominio/filtros.ts'
 import type { Cuestionario } from '../dominio/tipos.ts'
 
@@ -33,6 +34,7 @@ export function MisCuestionarios() {
   const [pendiente, setPendiente] = useState<Cuestionario | null>(null)
   const [menu, setMenu] = useState<string | null>(null)
   const [abriendo, setAbriendo] = useState<string | null>(null)
+  const [enlaceManual, setEnlaceManual] = useState<string | null>(null)
 
   function cargar() {
     if (!token) return
@@ -53,11 +55,15 @@ export function MisCuestionarios() {
 
   async function anfitrion(id: string) {
     if (!token) return
+    const ventana = prepararPestanaSala()
     setAbriendo(id)
     try {
       const creada = await sala.crear(token, id)
-      navegar(`/sala/${creada.codigo}`)
+      const publicada = publicarSala(ventana, creada.codigo)
+      if (!publicada.abierta) setEnlaceManual(publicada.url)
+      else setAbriendo(null)
     } catch (err) {
+      if (ventana && !ventana.closed) ventana.close()
       setError(mensajeDe(err))
       setAbriendo(null)
     }
@@ -88,6 +94,14 @@ export function MisCuestionarios() {
       </header>
       {cargando ? <EstadoCarga /> : null}
       {error ? <EstadoError mensaje={error} onReintentar={cargar} /> : null}
+      {enlaceManual ? (
+        <p>
+          El navegador bloqueó la pestaña nueva.{' '}
+          <a href={enlaceManual} target="_blank" rel="noreferrer">
+            Abrir la sala
+          </a>
+        </p>
+      ) : null}
       {!cargando && !error && lista.length === 0 ? (
         <EstadoVacio titulo="Todavía no tienes cuestionarios" detalle="Crea el primero para usarlo en clase." />
       ) : null}

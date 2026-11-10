@@ -10,6 +10,7 @@ import {
 import { IdentidadActual } from '../autenticacion/identidad-actual';
 import { IdentidadGuard } from '../autenticacion/identidad.guard';
 import type { IdentidadExterna } from '../autenticacion/identidad-externa';
+import { AvanzarDto } from './dto/avanzar.dto';
 import { CrearSesionDto } from './dto/crear-sesion.dto';
 import { ResponderDto } from './dto/responder.dto';
 import { SesionesJuegoService } from './sesiones-juego.service';
@@ -49,9 +50,10 @@ export class SesionesJuegoController {
   @UseGuards(IdentidadGuard)
   unirse(
     @Param('codigo') codigo: string,
+    @Body() cuerpo: { nombre?: string; avatarId?: string },
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
-    return this.sesiones.unirse(codigo, identidad);
+    return this.sesiones.unirse(codigo, identidad, cuerpo);
   }
 
   @Post('sesiones-juego/:codigo/iniciar')
@@ -86,8 +88,9 @@ export class SesionesJuegoController {
   @UseGuards(IdentidadGuard)
   avanzar(
     @Param('codigo') codigo: string,
+    @Body() entrada: AvanzarDto,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
-    return this.sesiones.avanzar(codigo, identidad);
+    return this.sesiones.avanzar(codigo, identidad, entrada.desde);
   }
 }

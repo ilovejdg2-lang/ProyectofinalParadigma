@@ -4,12 +4,15 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { MENSAJE_TAMANO_IMAGEN } from '../imagenes/validar-archivo';
 
 @Catch()
 export class FiltroErrores implements ExceptionFilter {
+  private readonly logger = new Logger(FiltroErrores.name);
+
   catch(excepcion: unknown, host: ArgumentsHost): void {
     const respuesta = host.switchToHttp().getResponse<Response>();
     if (excepcion instanceof HttpException) {
@@ -25,6 +28,17 @@ export class FiltroErrores implements ExceptionFilter {
         .json({ mensaje: mensajeArchivo });
       return;
     }
+    const codigo =
+      typeof excepcion === 'object' && excepcion && 'code' in excepcion
+        ? String(excepcion.code)
+        : '';
+    const texto =
+      excepcion instanceof Error
+        ? `${codigo} ${excepcion.name}: ${excepcion.message}`
+        : 'error no controlado';
+    this.logger.error(
+      texto.slice(0, 800).replace(/postgres(?:ql)?:\/\/\S+/gi, 'postgresql://***'),
+    );
     respuesta.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       mensaje: 'Ocurrió un error inesperado.',
     });

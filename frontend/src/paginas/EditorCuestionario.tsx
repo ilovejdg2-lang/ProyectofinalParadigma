@@ -14,13 +14,58 @@ function preguntaVacia(): BorradorPregunta {
     id: crypto.randomUUID(),
     enunciado: '',
     respuestaCorrecta: null,
-    opciones: [
-      { id: crypto.randomUUID(), texto: 'Verdadero' },
-      { id: crypto.randomUUID(), texto: 'Falso' },
-    ],
+    opciones: [1, 2, 3, 4].map(() => ({ id: crypto.randomUUID(), texto: '' })),
     opcionCorrectaId: null,
     imagenSimulada: false,
+    segundos: 20,
   }
+}
+
+function SelectorImagen({
+  url,
+  etiqueta,
+  ocupado,
+  onArchivo,
+  onQuitar,
+}: {
+  url?: string
+  etiqueta: string
+  ocupado: boolean
+  onArchivo: (archivo: File) => void
+  onQuitar: () => void
+}) {
+  return (
+    <div className="editor-imagen">
+      <span>{etiqueta}</span>
+      <div
+        className="editor-imagen-marco"
+        style={{ backgroundImage: url ? `url("${url.replaceAll('"', '')}")` : undefined }}
+      >
+        {url ? null : <span>Sin imagen</span>}
+      </div>
+      <div className="editor-imagen-acciones">
+        <label className="boton-fantasma">
+          {ocupado ? 'Subiendo…' : url ? 'Cambiar imagen' : 'Elegir imagen'}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.gif,.svg"
+            aria-label={etiqueta}
+            disabled={ocupado}
+            onChange={(evento) => {
+              const archivo = evento.target.files?.[0]
+              evento.target.value = ''
+              if (archivo) onArchivo(archivo)
+            }}
+          />
+        </label>
+        {url ? (
+          <button className="boton-fantasma" type="button" disabled={ocupado} onClick={onQuitar}>
+            Quitar imagen
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
 }
 
 function borradorVacio(): BorradorCuestionario {
@@ -43,8 +88,11 @@ export function EditorCuestionario() {
   const navegar = useNavigate()
   const [borrador, setBorrador] = useState<BorradorCuestionario>(borradorVacio)
   const [errores, setErrores] = useState<string[]>([])
+  const [subiendoImagen, setSubiendoImagen] = useState(false)
+  const [errorImagen, setErrorImagen] = useState<string | null>(null)
   const [sucio, setSucio] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [destino, setDestino] = useState<string | null>(null)
   const [cargando, setCargando] = useState(edicion)
   const [confirmarSalida, setConfirmarSalida] = useState(false)
   const [preguntaPorBorrar, setPreguntaPorBorrar] = useState<string | null>(null)
@@ -52,7 +100,11 @@ export function EditorCuestionario() {
   const [editandoInfo, setEditandoInfo] = useState(false)
   const [mostrandoTiempo, setMostrandoTiempo] = useState(false)
   const [arrastrando, setArrastrando] = useState<number | null>(null)
-  const bloqueo = useBlocker(sucio && !guardando)
+  const bloqueo = useBlocker(sucio && !guardando && !destino)
+
+  useEffect(() => {
+    if (destino) navegar(`/cuestionarios/${destino}`)
+  }, [destino, navegar])
 
   useEffect(() => {
     if (!id) return
@@ -86,6 +138,7 @@ export function EditorCuestionario() {
               (pregunta.respuestaCorrecta ? `${pregunta.id}:verdadero` : `${pregunta.id}:falso`),
             imagenUrl: pregunta.imagenUrl,
             imagenSimulada: false,
+            segundos: pregunta.segundos ?? 20,
           })),
         })
       })
@@ -113,6 +166,8 @@ export function EditorCuestionario() {
 
   async function cargarImagen(archivo: File, destino: 'portada' | string) {
     if (!token) return
+    setSubiendoImagen(true)
+    setErrorImagen(null)
     try {
       const resultado = await actividades.cargarImagen(token, archivo)
       if (destino === 'portada') {
@@ -121,7 +176,11 @@ export function EditorCuestionario() {
         actualizarPregunta(destino, { imagenUrl: resultado.url, imagenSimulada: resultado.origen === 'simulado' })
       }
     } catch (error) {
-      setErrores([mensajeDe(error)])
+      const texto = mensajeDe(error)
+      setErrorImagen(texto)
+      setErrores([texto])
+    } finally {
+      setSubiendoImagen(false)
     }
   }
 
@@ -233,10 +292,11 @@ export function EditorCuestionario() {
           })),
           imagenUrl: pregunta.imagenUrl,
           orden: indice + 1,
+          segundos: pregunta.segundos ?? 20,
         })),
       })
       setSucio(false)
-      navegar(`/cuestionarios/${guardado.id}`)
+      setDestino(guardado.id)
     } catch (error) {
       setErrores([mensajeDe(error)])
     } finally {
@@ -331,9 +391,9 @@ export function EditorCuestionario() {
               <button className="icono-fila" type="button" aria-label={`Duplicar pregunta ${indice + 1}`} onClick={() => duplicarPregunta(pregunta.id)}>
                 <IconoCopiar />
               </button>
-              <span className="tiempo-pregunta">
-                <IconoReloj /> 20 segundos
-              </span>
+              <button className="tiempo-pregunta" type="button" onClick={() => setPreguntaAbierta(pregunta.id)}>
+                <IconoReloj /> {pregunta.segundos ?? 20} segundos
+              </button>
             </article>
           ))}
         </div>
@@ -381,6 +441,17 @@ export function EditorCuestionario() {
               <span>Etiquetas, separadas por coma</span>
               <input className="campo" value={borrador.etiquetas} onChange={(evento) => actualizar({ etiquetas: evento.target.value })} />
             </label>
+            <SelectorImagen
+              url={borrador.imagenUrl}
+              etiqueta="Imagen de portada"
+              ocupado={subiendoImagen}
+              onArchivo={(archivo) => void cargarImagen(archivo, 'portada')}
+              onQuitar={() => actualizar({ imagenUrl: undefined, imagenSimulada: false })}
+            />
+            {errorImagen ? <p className="error-texto" role="alert">{errorImagen}</p> : null}
+            {borrador.imagenSimulada ? (
+              <p className="aviso">Vista previa local. Los otros dispositivos la verán cuando la API de actividades devuelva una URL.</p>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -396,27 +467,37 @@ export function EditorCuestionario() {
                     </button>
                   </div>
                   <div className="editor-lienzo">
-                    <label className="zona-media">
-                      <span>Imagen opcional</span>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                        onChange={(evento) => {
-                          const archivo = evento.target.files?.[0]
-                          if (archivo) void cargarImagen(archivo, pregunta.id)
-                        }}
+                    <div className="zona-media">
+                      <SelectorImagen
+                        url={pregunta.imagenUrl}
+                        etiqueta={`Imagen de la pregunta ${indice + 1}`}
+                        ocupado={subiendoImagen}
+                        onArchivo={(archivo) => void cargarImagen(archivo, pregunta.id)}
+                        onQuitar={() => actualizarPregunta(pregunta.id, { imagenUrl: undefined, imagenSimulada: false })}
                       />
-                      {pregunta.imagenUrl ? <img className="vista-imagen" src={pregunta.imagenUrl} alt="" /> : null}
+                      {errorImagen ? <p className="error-texto" role="alert">{errorImagen}</p> : null}
                       {pregunta.imagenSimulada ? <p className="aviso">Imagen simulada en este navegador.</p> : null}
-                    </label>
+                    </div>
                     <textarea
                       className="enunciado-editor"
                       aria-label={`Enunciado de la pregunta ${indice + 1}`}
-                      placeholder="Escribe la pregunta de verdadero o falso"
+                      placeholder="Escribe la pregunta"
                       value={pregunta.enunciado}
                       onChange={(evento) => actualizarPregunta(pregunta.id, { enunciado: evento.target.value })}
                     />
                   </div>
+                  <label className="campo-grupo">
+                    <span>Segundos para responder</span>
+                    <input
+                      className="campo"
+                      type="number"
+                      min={5}
+                      max={120}
+                      aria-label={`Segundos de la pregunta ${indice + 1}`}
+                      value={pregunta.segundos ?? 20}
+                      onChange={(evento) => actualizarPregunta(pregunta.id, { segundos: Number(evento.target.value) })}
+                    />
+                  </label>
                   <div className="respuestas-editor" role="radiogroup" aria-label={`Respuesta correcta de la pregunta ${indice + 1}`}>
                     {pregunta.opciones.map((opcion, numero) => (
                       <div
@@ -425,6 +506,7 @@ export function EditorCuestionario() {
                       >
                         <input
                           aria-label={`Respuesta ${numero + 1} de la pregunta ${indice + 1}`}
+                          placeholder={`Respuesta ${numero + 1}`}
                           value={opcion.texto}
                           onChange={(evento) => cambiarOpcion(pregunta.id, opcion.id, evento.target.value)}
                         />
@@ -465,7 +547,7 @@ export function EditorCuestionario() {
       <Dialogo
         abierto={mostrandoTiempo}
         titulo="Límite de tiempo"
-        mensaje="Cada pregunta dura 20 segundos. Ese tiempo lo marca la partida en vivo y es el mismo para todas."
+        mensaje="Cada pregunta puede durar entre 5 y 120 segundos. El tiempo se edita al abrir la pregunta y lo aplica el servidor al iniciar esa ronda."
         confirmar="Entendido"
         onConfirmar={() => setMostrandoTiempo(false)}
         onCancelar={() => setMostrandoTiempo(false)}

@@ -23,6 +23,7 @@ enum EstadoSesion {
   esperando
   pregunta
   cerrada
+  clasificacion
   finalizada
 }
 
@@ -113,7 +114,11 @@ model SesionJuego {
   estado               EstadoSesion @default(esperando)
   preguntaActual       Int          @default(0)
   segundos             Int          @default(20)
+  /// Instante en que la pregunta actual admite respuestas.
+  iniciaEn             DateTime?    @db.Timestamptz(3)
   cierraEn             DateTime?    @db.Timestamptz(3)
+  /// Participantes congelados al abrir la pregunta. Quien entra después no cuenta.
+  elegibles            String[]     @default([])
   /// Copia de preguntas y opciones al iniciar. Conserva el enunciado y la
   /// respuesta que se jugaron aunque el cuestionario se edite después.
   preguntasInstantanea Json?
@@ -136,6 +141,7 @@ model Participante {
   sesion         SesionJuego @relation(fields: [sesionId], references: [id], onDelete: Restrict)
   perfilId       String
   nombre         String
+  avatarId       String?
   conectado      Boolean     @default(true)
   puntaje        Int         @default(0)
   aciertos       Int         @default(0)

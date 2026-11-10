@@ -1,27 +1,39 @@
-# Cliente Adicional de Demostración
+# Cliente adicional de demostración
 
-Página web estática que demuestra el consumo externo e independiente de las APIs de **ProfeLink**:
-1. `auth-service` (puerto `5001`): Registro, Login, Rotación de Refresh Token (7 días) y consulta de perfil mediante JWT firmado asimétricamente con **RS256**.
-2. `actividades` (puerto `5002`): Consulta de catálogo público, cuestionarios protegidos para docentes (`/mis-cuestionarios`) e historial de resultados.
-3. Canal WebSocket en vivo (`ws://localhost:5002/canal?codigo=ABCDEF`): Conexión directa y recepción de eventos en tiempo real.
+Página estática que consume las APIs sin usar el código del frontend React:
 
-## Uso
+1. `auth-service`: login, rotación del refresh token y lectura del perfil con JWT RS256.
+2. `actividades`: catálogo público, cuestionarios del docente e historial.
+3. Canal en vivo: `ws://<host>/canal?codigo=<CODIGO>`. El JWT no va en la URL. El navegador lo envía en `Sec-WebSocket-Protocol` como `profelink` y `profelink-bearer.<JWT>`. El servidor solo acepta al anfitrión o a un participante ya registrado en esa sala.
 
-Simplemente abre `index.html` en cualquier navegador web o sírvelo con:
+## Cómo probarlo
+
+1. Tené en marcha la instalación local (`scripts/iniciar.ps1`) o los servicios que quieras apuntar. Para producción, usá las URLs públicas y una cuenta recibida por el canal privado. No pegues la contraseña en el archivo.
+2. Serví la carpeta para evitar restricciones de `file://`:
 
 ```bash
 npx serve cliente-adicional
 ```
 
-## Verificación concurrente de solo lectura
+3. Completá las URLs, el correo y la contraseña. Iniciá sesión.
+4. Probá `GET /cuestionarios`, `GET /mis-cuestionarios` y `GET /resultados`.
+5. Entrá a una sala de la que esa cuenta sea anfitrión o participante e indicá el código. El estado debe pasar a conectado sin que el token aparezca en la URL del socket.
 
-Con `auth-service` y `actividades` ejecutándose localmente, puedes verificar su disponibilidad y consultar el catálogo desde un cliente Node independiente:
+## Comprobación del protocolo
+
+```bash
+node --test cliente-adicional/protocolo-canal.test.mjs
+```
+
+Esa prueba lee `index.html` y confirma que el ejemplo usa el subprotocolo y que no queda `access_token` en la página. No abre un WebSocket real.
+
+## Lecturas concurrentes
+
+Con los dos servicios en localhost:
 
 ```bash
 node --test cliente-adicional/prueba-carga-lectura.test.mjs
 node cliente-adicional/prueba-carga-lectura.mjs
 ```
 
-La prueba envía 20 solicitudes `GET` con concurrencia máxima de 4 y comprueba `/health/ready`, `/salud`, `/banco-preguntas` y `/cuestionarios`. No registra, modifica ni elimina datos. Por seguridad, el cliente solo acepta destinos `localhost`, `127.0.0.1` o `::1`.
-
-Para ajustar una ejecución local, usa `AUTH_URL`, `ACTIVITIES_URL`, `CONCURRENCY` e `ITERATIONS`. La concurrencia permitida es de 1 a 10 y las iteraciones de 4 a 100; no conviene aumentar esos límites para una comprobación de desarrollo.
+El runner hace solo `GET`, limita el destino a loopback y no debe apuntarse a producción.

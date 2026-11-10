@@ -18,11 +18,22 @@ async function bootstrap() {
     });
   });
   const config = app.get(ConfigService);
-  const origen = config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+  const origenes = (config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173')
+    .split(',')
+    .map((origen) => origen.trim())
+    .filter(Boolean);
+  const origenLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
   app.enableCors({
-    origin: origen,
+    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+      if (!origin || origenes.includes(origin) || origenLocal.test(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   const openApiConfig = createOpenApiConfig();

@@ -7,6 +7,7 @@ import {
 import { IdentidadExterna } from '../autenticacion/identidad-externa';
 import { PrismaService } from '../prisma/prisma.service';
 import { AvisoSesionesLocal } from './aviso-sesiones';
+import { MILISEGUNDOS_CUENTA } from './presentacion-sala';
 import { SesionesJuegoService } from './sesiones-juego.service';
 import { cuestionarioValido, SesionMemoria } from '../../test/sesion-memoria';
 
@@ -134,6 +135,55 @@ describe('SesionesJuegoService', () => {
     );
   });
 
+  it('guarda el avatar elegido y no deja que otra persona lo cambie', async () => {
+    const { servicio, memoria } = armar();
+    const sala = await servicio.crear('quiz-1', ana);
+    const conAvatar = await servicio.unirse(sala.codigo, luis, {
+      nombre: 'Luis',
+      avatarId: 'maga-rosa',
+    });
+    expect(conAvatar.participantes[0]).toMatchObject({
+      perfilId: 'luis',
+      avatarId: 'maga-rosa',
+    });
+
+    const reconexion = await servicio.unirse(sala.codigo, luis, {
+      nombre: 'Luis',
+      avatarId: 'panda-verde',
+    });
+    expect(reconexion.participantes[0].avatarId).toBe('panda-verde');
+
+    const ajena = await servicio.unirse(
+      sala.codigo,
+      { id: 'marta', nombre: 'Marta' },
+      { avatarId: 'dinosaurio-verde' },
+    );
+    expect(
+      ajena.participantes.find((item) => item.perfilId === 'luis')?.avatarId,
+    ).toBe('panda-verde');
+    expect(
+      ajena.participantes.find((item) => item.perfilId === 'marta')?.avatarId,
+    ).toBe('dinosaurio-verde');
+
+    const invalido = await servicio.unirse(
+      sala.codigo,
+      { id: 'nora', nombre: 'Nora' },
+      { avatarId: 'no es valido' },
+    );
+    expect(
+      invalido.participantes.find((item) => item.perfilId === 'nora')?.avatarId,
+    ).toBeUndefined();
+
+    memoria.sesiones[0].estado = 'pregunta';
+    const durante = await servicio.unirse(sala.codigo, luis, {
+      nombre: 'Luis',
+      avatarId: 'gato-naranja',
+    });
+    expect(
+      durante.participantes.find((item) => item.perfilId === 'luis')?.avatarId,
+    ).toBe('panda-verde');
+  });
+
   it('incorpora participantes sin duplicarlos y rechaza una sala finalizada', async () => {
     const { servicio, memoria, avisos } = armar();
     const sala = await servicio.crear('quiz-1', ana);
@@ -207,11 +257,13 @@ describe('SesionesJuegoService', () => {
     const antes = Date.now();
     const iniciada = await servicio.iniciar(sala.codigo, ana);
     const limite = new Date(iniciada.cierraEn ?? 0).getTime();
+    const abre = new Date(iniciada.abreEn ?? 0).getTime();
     expect(iniciada.estado).toBe('pregunta');
     expect(iniciada.preguntaActual).toBe(0);
     expect(iniciada.segundos).toBe(15);
-    expect(limite).toBeGreaterThanOrEqual(antes + 15_000);
-    expect(limite).toBeLessThanOrEqual(Date.now() + 15_000);
+    expect(limite - abre).toBe(15_000);
+    expect(abre).toBeGreaterThanOrEqual(antes + MILISEGUNDOS_CUENTA);
+    expect(limite).toBeLessThanOrEqual(Date.now() + 15_000 + MILISEGUNDOS_CUENTA);
     expect(JSON.stringify(iniciada)).not.toContain('correcta');
     expect(
       memoria.sesiones[0].preguntasInstantanea?.preguntas[0],

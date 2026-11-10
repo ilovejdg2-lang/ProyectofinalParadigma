@@ -33,8 +33,17 @@ export class AlmacenUsuariosHibrido extends AlmacenUsuarios implements OnModuleI
     try {
       const db = this.prisma.obtener();
       const count = await db.user.count();
-      if (count > 0) return;
+      if (count === 0) {
+        await this.sembrarCuentasIniciales(db);
+      }
+      await this.asegurarDocenteFrontend(db);
+    } catch (error) {
+      this.logger.warn(`Error al sembrar en PostgreSQL: ${error}`);
+    }
+  }
 
+  private async sembrarCuentasIniciales(db: ReturnType<PrismaService['obtener']>) {
+    try {
       this.logger.log('Sembrando datos iniciales en PostgreSQL...');
       const inst = await db.institution.upsert({
         where: { id: 'inst-una' },
@@ -72,6 +81,7 @@ export class AlmacenUsuariosHibrido extends AlmacenUsuarios implements OnModuleI
 
       const salt = await bcrypt.genSalt(10);
       const teacherHash = await bcrypt.hash('Profesor123!', salt);
+      const demoFrontendHash = await bcrypt.hash('Demo-2026', salt);
       const studentHash = await bcrypt.hash('Estudiante123!', salt);
       const adminHash = await bcrypt.hash('Admin123!', salt);
 
@@ -81,6 +91,16 @@ export class AlmacenUsuariosHibrido extends AlmacenUsuarios implements OnModuleI
             id: 'perfil-demo-docente',
             email: 'profesor@una.cr',
             passwordHash: teacherHash,
+            displayName: 'Docente de prueba',
+            role: 'teacher',
+            emailVerified: true,
+            institutionId: inst.id,
+            status: 'Active',
+          },
+          {
+            id: 'perfil-demo',
+            email: 'docente.demo@profelink.test',
+            passwordHash: demoFrontendHash,
             displayName: 'Docente de prueba',
             role: 'teacher',
             emailVerified: true,
@@ -113,6 +133,39 @@ export class AlmacenUsuariosHibrido extends AlmacenUsuarios implements OnModuleI
     } catch (error) {
       this.logger.warn(`Error al sembrar en PostgreSQL: ${error}`);
     }
+  }
+
+  private async asegurarDocenteFrontend(db: ReturnType<PrismaService['obtener']>) {
+    const email = 'docente.demo@profelink.test';
+    const yaExiste = await db.user.findFirst({
+      where: { OR: [{ email }, { id: 'perfil-demo' }] },
+    });
+    if (yaExiste) return;
+
+    const inst = await db.institution.upsert({
+      where: { id: 'inst-una' },
+      update: {},
+      create: {
+        id: 'inst-una',
+        name: 'Universidad Nacional de Costa Rica (UNA)',
+        isActive: true,
+      },
+    });
+
+    const passwordHash = await bcrypt.hash('Demo-2026', 10);
+    await db.user.create({
+      data: {
+        id: 'perfil-demo',
+        email,
+        passwordHash,
+        displayName: 'Docente de prueba',
+        role: 'teacher',
+        emailVerified: true,
+        institutionId: inst.id,
+        status: 'Active',
+      },
+    });
+    this.logger.log('Cuenta docente.demo@profelink.test asegurada en PostgreSQL.');
   }
 
   async buscarPorEmail(email: string): Promise<UsuarioEntidad | null> {
@@ -197,6 +250,7 @@ export class AlmacenUsuariosHibrido extends AlmacenUsuarios implements OnModuleI
       where: { id },
       data: {
         ...(datos.displayName ? { displayName: datos.displayName } : {}),
+        ...(datos.passwordHash ? { passwordHash: datos.passwordHash } : {}),
         ...(datos.emailVerified !== undefined ? { emailVerified: datos.emailVerified } : {}),
         ...(datos.status ? { status: datos.status } : {}),
         ...(datos.role ? { role: datos.role } : {}),

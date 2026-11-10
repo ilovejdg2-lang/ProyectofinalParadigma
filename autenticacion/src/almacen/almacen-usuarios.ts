@@ -91,7 +91,6 @@ export class AlmacenUsuariosMemoria extends AlmacenUsuarios implements OnModuleI
     const teacherPasswordHash = await bcrypt.hash('Profesor123!', salt);
     const demoFrontendPasswordHash = await bcrypt.hash('Demo-2026', salt);
     const studentPasswordHash = await bcrypt.hash('Estudiante123!', salt);
-    const fatimaPasswordHash = await bcrypt.hash('F1T3M12107', salt);
     const adminPasswordHash = await bcrypt.hash('Admin123!', salt);
 
     const teacherDemo: UsuarioEntidad = {
@@ -133,19 +132,6 @@ export class AlmacenUsuariosMemoria extends AlmacenUsuarios implements OnModuleI
       updatedAt: new Date(),
     };
 
-    const fatimaStudent: UsuarioEntidad = {
-      id: 'perfil-fatima-una',
-      email: 'fatima.carrillo.garcia@est.una.ac.cr',
-      passwordHash: fatimaPasswordHash,
-      displayName: 'Fátima Carrillo García',
-      role: 'student',
-      emailVerified: true,
-      institutionId: 'inst-una',
-      status: 'Active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
     const adminDemo: UsuarioEntidad = {
       id: 'perfil-demo-admin',
       email: 'admin@una.cr',
@@ -162,7 +148,6 @@ export class AlmacenUsuariosMemoria extends AlmacenUsuarios implements OnModuleI
     this.usuarios.set(teacherDemo.email, teacherDemo);
     this.usuarios.set(teacherFrontendDemo.email, teacherFrontendDemo);
     this.usuarios.set(studentDemo.email, studentDemo);
-    this.usuarios.set(fatimaStudent.email, fatimaStudent);
     this.usuarios.set(adminDemo.email, adminDemo);
 
     this.logger.log('Almacén en memoria inicializado con usuarios demo y políticas de la UNA.');

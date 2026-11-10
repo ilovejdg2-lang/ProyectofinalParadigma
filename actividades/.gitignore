@@ -3,9 +3,11 @@ dist/
 coverage/
 src/generated/
 datos/
+almacen-imagenes/
 
 .env
 .env.*
 !.env.example
 
 *.log
+tmp-*.js

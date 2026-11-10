@@ -9,12 +9,20 @@ export interface RegistroPerfil {
   contrasena: string
 }
 
+export interface SolicitudRecuperacion {
+  mensaje: string
+  codigo?: string
+}
+
 export interface ClienteAutenticacion {
   registrar(datos: RegistroPerfil): Promise<Sesion>
   iniciarSesion(correo: string, contrasena: string): Promise<Sesion>
   cerrarSesion(token: string): Promise<void>
   sesionActual(token: string): Promise<Sesion | null>
   cambiarContrasena(token: string, actual: string, nueva: string): Promise<void>
+  actualizarPerfil(token: string, nombre: string): Promise<Sesion>
+  solicitarRecuperacion(correo: string): Promise<SolicitudRecuperacion>
+  restablecerContrasena(codigo: string, nueva: string): Promise<void>
 }
 
 interface UsuarioGuardado extends Perfil {
@@ -24,6 +32,7 @@ interface UsuarioGuardado extends Perfil {
 interface EstadoAuth {
   usuarios: UsuarioGuardado[]
   sesiones: { token: string; perfilId: string }[]
+  recuperaciones: { codigo: string; perfilId: string; expira: number }[]
 }
 
 const CLAVE = 'profelink.auth.v1'
@@ -44,20 +53,16 @@ function leer(almacen: Almacen): EstadoAuth {
           contrasena: CONTRASENA_DEMO,
           rol: 'teacher',
         },
-        {
-          id: 'perfil-fatima-una',
-          nombre: 'Fátima Carrillo García',
-          correo: 'fatima.carrillo.garcia@est.una.ac.cr',
-          contrasena: 'F1T3M12107',
-          rol: 'student',
-        },
       ],
       sesiones: [],
+      recuperaciones: [],
     }
     almacen.escribir(CLAVE, JSON.stringify(inicial))
     return inicial
   }
-  return JSON.parse(texto) as EstadoAuth
+  const estado = JSON.parse(texto) as EstadoAuth
+  if (!Array.isArray(estado.recuperaciones)) estado.recuperaciones = []
+  return estado
 }
 
 function guardar(almacen: Almacen, estado: EstadoAuth) {
@@ -68,7 +73,7 @@ function sesionDe(estado: EstadoAuth, token: string): Sesion | null {
   const sesion = estado.sesiones.find((item) => item.token === token)
   const usuario = estado.usuarios.find((item) => item.id === sesion?.perfilId)
   if (!sesion || !usuario) return null
-  return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol ?? (usuario.correo.endsWith('@una.cr') ? 'teacher' : 'student') } }
+  return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol ?? (usuario.correo.endsWith('@una.cr') ? 'teacher' : 'student'), creadoEn: usuario.creadoEn } }
 }
 
 export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticacion {
@@ -84,6 +89,7 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
         nombre: datos.nombre.trim(),
         correo,
         contrasena: datos.contrasena,
+        creadoEn: new Date().toISOString(),
       }
       const token = crearId()
       estado.usuarios.push(usuario)
@@ -123,7 +129,61 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
       usuario.contrasena = nueva
       guardar(almacen, estado)
     },
+    async actualizarPerfil(token, nombre) {
+      const estado = leer(almacen)
+      const sesion = estado.sesiones.find((item) => item.token === token)
+      const usuario = estado.usuarios.find((item) => item.id === sesion?.perfilId)
+      const limpio = nombre.trim()
+      if (!usuario) throw new ErrorServicio('permiso', 'La sesión no es válida.')
+      if (limpio.length < 3) throw new ErrorServicio('validacion', 'El nombre necesita al menos 3 caracteres.')
+      usuario.nombre = limpio
+      guardar(almacen, estado)
+      return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol, creadoEn: usuario.creadoEn } }
+    },
+    async solicitarRecuperacion(correo) {
+      const estado = leer(almacen)
+      const usuario = estado.usuarios.find((item) => item.correo === correo.trim().toLowerCase())
+      const mensaje =
+        'Si el correo está registrado, usa el código de recuperación para definir una nueva contraseña.'
+      if (!usuario) return { mensaje }
+      const codigo = crearId().replace(/-/g, '').slice(0, 12)
+      estado.recuperaciones = estado.recuperaciones.filter((item) => item.perfilId !== usuario.id)
+      estado.recuperaciones.push({
+        codigo,
+        perfilId: usuario.id,
+        expira: Date.now() + 30 * 60 * 1000,
+      })
+      guardar(almacen, estado)
+      return { mensaje, codigo }
+    },
+    async restablecerContrasena(codigo, nueva) {
+      const estado = leer(almacen)
+      const recuperacion = estado.recuperaciones.find((item) => item.codigo === codigo.trim())
+      if (!recuperacion || recuperacion.expira < Date.now()) {
+        throw new ErrorServicio('validacion', 'El código de recuperación no es válido o ha expirado.')
+      }
+      if (nueva.length < 8) {
+        throw new ErrorServicio('validacion', 'La nueva contraseña debe tener al menos 8 caracteres.')
+      }
+      const usuario = estado.usuarios.find((item) => item.id === recuperacion.perfilId)
+      if (!usuario) {
+        throw new ErrorServicio('validacion', 'El código de recuperación no es válido o ha expirado.')
+      }
+      usuario.contrasena = nueva
+      estado.sesiones = estado.sesiones.filter((item) => item.perfilId !== usuario.id)
+      estado.recuperaciones = estado.recuperaciones.filter((item) => item.codigo !== recuperacion.codigo)
+      guardar(almacen, estado)
+    },
   }
+}
+
+function esSesion(cuerpo: Sesion | Perfil): cuerpo is Sesion {
+  return 'perfil' in cuerpo
+}
+
+function sesionDesde(token: string, cuerpo: Sesion | Perfil): Sesion {
+  if (esSesion(cuerpo)) return cuerpo
+  return { token, perfil: cuerpo }
 }
 
 async function leerMensaje(respuesta: Response): Promise<string> {
@@ -149,11 +209,16 @@ export function crearAutenticacionHttp(baseUrl: string): ClienteAutenticacion {
       return (await respuesta.json()) as Sesion
     },
     async iniciarSesion(correo, contrasena) {
-      const respuesta = await fetch(`${raiz}/sesiones`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ correo, contrasena }),
-      })
+      let respuesta: Response
+      try {
+        respuesta = await fetch(`${raiz}/sesiones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ correo, contrasena }),
+        })
+      } catch {
+        throw new ErrorServicio('conexion', 'No se pudo conectar con el servicio de autenticación.')
+      }
       if (!respuesta.ok) throw new ErrorServicio('credenciales', await leerMensaje(respuesta))
       return (await respuesta.json()) as Sesion
     },
@@ -173,7 +238,7 @@ export function crearAutenticacionHttp(baseUrl: string): ClienteAutenticacion {
       return (await respuesta.json()) as Sesion
     },
     async cambiarContrasena(token, actual, nueva) {
-      const respuesta = await fetch(`${raiz}/perfiles/password`, {
+      const opciones = {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -183,7 +248,50 @@ export function crearAutenticacionHttp(baseUrl: string): ClienteAutenticacion {
           contrasenaActual: actual,
           nuevaContrasena: nueva,
         }),
-      })
+      }
+      let respuesta = await fetch(`${raiz}/perfiles/password`, opciones)
+      if (respuesta.status === 404) respuesta = await fetch(`${raiz}/api/v1/auth/change-password`, opciones)
+      if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
+    },
+    async actualizarPerfil(token, nombre) {
+      const opciones = {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ nombre }),
+      }
+      let respuesta = await fetch(`${raiz}/perfiles/actual`, opciones)
+      if (respuesta.status === 404) respuesta = await fetch(`${raiz}/api/v1/auth/me`, opciones)
+      if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
+      return sesionDesde(token, (await respuesta.json()) as Sesion | Perfil)
+    },
+    async solicitarRecuperacion(correo) {
+      let respuesta: Response
+      try {
+        respuesta = await fetch(`${raiz}/recuperacion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ correo }),
+        })
+      } catch {
+        throw new ErrorServicio('conexion', 'No se pudo conectar con el servicio de autenticación.')
+      }
+      if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
+      return (await respuesta.json()) as SolicitudRecuperacion
+    },
+    async restablecerContrasena(codigo, nueva) {
+      let respuesta: Response
+      try {
+        respuesta = await fetch(`${raiz}/recuperacion/restablecer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ codigo, nuevaContrasena: nueva }),
+        })
+      } catch {
+        throw new ErrorServicio('conexion', 'No se pudo conectar con el servicio de autenticación.')
+      }
       if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
     },
   }

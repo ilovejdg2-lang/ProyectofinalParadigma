@@ -16,6 +16,7 @@ export interface Perfil {
   nombre: string
   correo: string
   rol?: 'teacher' | 'student' | 'admin' | string
+  creadoEn?: string
 }
 
 export interface Sesion {
@@ -73,6 +74,7 @@ export interface BorradorPregunta {
   opcionCorrectaId: string | null
   imagenUrl?: string
   imagenSimulada: boolean
+  segundos?: number
 }
 
 export interface BorradorCuestionario {
@@ -86,7 +88,7 @@ export interface BorradorCuestionario {
   preguntas: BorradorPregunta[]
 }
 
-export type EstadoSala = 'esperando' | 'pregunta' | 'cerrada' | 'finalizada'
+export type EstadoSala = 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada'
 
 export interface RespuestaParticipante {
   preguntaId: string
@@ -95,12 +97,15 @@ export interface RespuestaParticipante {
   aceptada: boolean
   tardia: boolean
   puntos: number
+  milisegundos?: number
+  enviadaEn?: string
 }
 
 export interface Participante {
   id: string
   perfilId: string
   nombre: string
+  avatarId?: string
   conectado: boolean
   puntaje: number
   aciertos: number
@@ -117,7 +122,10 @@ export interface Sala {
   estado: EstadoSala
   preguntaActual: number
   segundos: number
+  iniciaEn?: string | null
   cierraEn: string | null
+  elegibles?: string[]
+  abreEn?: string | null
   participantes: Participante[]
   preguntas: Pregunta[]
   canal: 'simulado' | 'remoto'

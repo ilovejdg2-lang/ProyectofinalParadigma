@@ -8,6 +8,7 @@ export interface PerfilPublico {
   correo: string;
   rol: RolUsuario;
   emailVerificado: boolean;
+  creadoEn?: string;
 }
 
 export interface TokensRespuesta {

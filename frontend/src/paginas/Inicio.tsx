@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Particulas } from '../componentes/Particulas.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 
 export function Inicio() {
@@ -8,6 +9,7 @@ export function Inicio() {
   return (
     <>
       <section className="banner">
+        <Particulas />
         <h1>Evaluaciones en vivo</h1>
         <p>
           Hola, {perfil?.nombre}. {esDocente
@@ -27,7 +29,7 @@ export function Inicio() {
         {esDocente ? (
           <article className="panel tarjeta-inicio acento-naranja">
             <h2>Crear</h2>
-            <p className="meta">Arma preguntas de verdadero o falso y adjunta una imagen si la necesitas.</p>
+            <p className="meta">Arma preguntas con cuatro respuestas, como en Kahoot, y adjunta una imagen si la necesitas.</p>
             <Link className="boton" to="/cuestionarios/nuevo">
               Nuevo cuestionario
             </Link>

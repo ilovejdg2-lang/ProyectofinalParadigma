@@ -3,6 +3,14 @@ import { EstadoCarga } from '../componentes/Interfaz.tsx'
 import { Marco } from '../componentes/Marco.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { InicioSesion, Registro } from '../paginas/Acceso.tsx'
+import {
+  LandingPublica,
+  PaginaAyuda,
+  PaginaContacto,
+  PaginaDocumentacion,
+  PaginaPrivacidad,
+  PaginaTerminos,
+} from '../paginas/publico/LandingPublica.tsx'
 import { Descubrir } from '../paginas/Descubrir.tsx'
 import { DetalleCuestionario } from '../paginas/DetalleCuestionario.tsx'
 import { EditorCuestionario } from '../paginas/EditorCuestionario.tsx'
@@ -19,7 +27,10 @@ export function RutaProtegida() {
   const { perfil, listo } = useAutenticacion()
   const ubicacion = useLocation()
   if (!listo) return <EstadoCarga texto="Comprobando la sesión…" />
-  if (!perfil) return <Navigate to="/iniciar-sesion" replace state={{ desde: ubicacion.pathname }} />
+  if (!perfil) {
+    if (ubicacion.pathname === '/') return <LandingPublica />
+    return <Navigate to="/iniciar-sesion" replace state={{ desde: ubicacion.pathname }} />
+  }
   return <Outlet />
 }
 
@@ -36,17 +47,22 @@ export function rutasAplicacion() {
   return [
     { path: '/iniciar-sesion', element: <InicioSesion /> },
     { path: '/registro', element: <Registro /> },
+    { path: '/contacto', element: <PaginaContacto /> },
+    { path: '/ayuda', element: <PaginaAyuda /> },
+    { path: '/documentacion', element: <PaginaDocumentacion /> },
+    { path: '/privacidad', element: <PaginaPrivacidad /> },
+    { path: '/terminos', element: <PaginaTerminos /> },
     {
       element: <RutaProtegida />,
       children: [
         { path: '/partida/:codigo', element: <Partida /> },
+        { path: '/unirse', element: <Unirse /> },
         {
           element: <Marco />,
           children: [
             { index: true, element: <Inicio /> },
             { path: '/descubrir', element: <Descubrir /> },
             { path: '/cuestionarios/:id', element: <DetalleCuestionario /> },
-            { path: '/unirse', element: <Unirse /> },
             { path: '/resultados/:codigo', element: <Resultados /> },
             { path: '/historial', element: <Historial /> },
             { path: '/perfil', element: <Perfil /> },

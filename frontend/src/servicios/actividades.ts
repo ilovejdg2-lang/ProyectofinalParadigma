@@ -47,15 +47,11 @@ function leer(almacen: Almacen): Cuestionario[] {
     return iniciales
   }
   const guardados = JSON.parse(texto) as Cuestionario[]
-  const faltantesDemo = iniciales.filter(
-    (demo) => !guardados.some((actual) => actual.id === demo.id),
-  )
-  if (faltantesDemo.length > 0) {
-    const combinados = deduplicarCuestionarios([...guardados, ...faltantesDemo])
-    almacen.escribir(CLAVE, JSON.stringify(combinados))
-    return combinados
-  }
-  return deduplicarCuestionarios(guardados)
+  const propios = guardados.filter((actual) => !iniciales.some((demo) => demo.id === actual.id))
+  const combinados = deduplicarCuestionarios([...iniciales, ...propios])
+  const cambio = JSON.stringify(combinados) !== JSON.stringify(deduplicarCuestionarios(guardados))
+  if (cambio) almacen.escribir(CLAVE, JSON.stringify(combinados))
+  return combinados
 }
 
 function guardarLista(almacen: Almacen, lista: Cuestionario[]) {

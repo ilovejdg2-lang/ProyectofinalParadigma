@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Buho } from './Buho.tsx'
 import { ReporteProblema } from './ReporteProblema.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
+import { leerTema } from '../tema.ts'
 
 const curso = [
   { to: '/', etiqueta: 'Vista general', detalle: 'Evaluaciones en vivo', fin: true, icono: 'inicio' },
   { to: '/descubrir', etiqueta: 'Descubrir', detalle: 'Catálogo de cuestionarios', icono: 'buscar' },
   { to: '/mis-cuestionarios', etiqueta: 'Mis cuestionarios', detalle: 'Los que creaste', icono: 'lista' },
-  { to: '/cuestionarios/nuevo', etiqueta: 'Crear cuestionario', detalle: 'Verdadero o falso', icono: 'mas' },
+  { to: '/cuestionarios/nuevo', etiqueta: 'Crear cuestionario', detalle: 'Cuatro respuestas', icono: 'mas' },
   { to: '/unirse', etiqueta: 'Unirse a una partida', detalle: 'Entrar con el código', icono: 'puerta' },
 ]
 
@@ -24,14 +25,24 @@ export function Marco() {
   const { simulacion } = useServicios()
   const [abierta, setAbierta] = useState(false)
   const [contraida, setContraida] = useState(false)
-  const [claro, setClaro] = useState(() => localStorage.getItem('profelink.tema') === 'claro')
+  const [claro, setClaro] = useState(() => leerTema() === 'claro')
   const [reporte, setReporte] = useState(false)
+  const enJuego = /^\/(sala|partida|resultados)\//.test(useLocation().pathname)
   const inicial = perfil?.nombre.slice(0, 1).toUpperCase() ?? 'M'
 
   useEffect(() => {
     document.documentElement.dataset.tema = claro ? 'claro' : 'oscuro'
     localStorage.setItem('profelink.tema', claro ? 'claro' : 'oscuro')
   }, [claro])
+
+  useEffect(() => {
+    if (!abierta) return
+    function alTeclado(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') setAbierta(false)
+    }
+    window.addEventListener('keydown', alTeclado)
+    return () => window.removeEventListener('keydown', alTeclado)
+  }, [abierta])
 
   function cambiarTema() {
     const aplicar = () => {
@@ -51,10 +62,23 @@ export function Marco() {
   })
 
   return (
-    <div className={`aplicacion${contraida ? ' contraida' : ''}${claro ? ' claro' : ''}`}>
+    <div className={`aplicacion${contraida ? ' contraida' : ''}${claro ? ' claro' : ''}${enJuego ? ' en-juego' : ''}`}>
       <header className="cabecera">
-        <button className="cabecera-menu" type="button" aria-expanded={abierta} onClick={() => setAbierta((valor) => !valor)}>
-          Menú
+        <button
+          className="cabecera-menu"
+          type="button"
+          aria-expanded={abierta}
+          aria-controls="navegacion-principal"
+          aria-label={abierta ? 'Cerrar menú' : 'Abrir menú'}
+          onClick={() => setAbierta((valor) => !valor)}
+        >
+          <svg className="icono-nav" viewBox="0 0 24 24" aria-hidden="true">
+            {abierta ? (
+              <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            ) : (
+              <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            )}
+          </svg>
         </button>
         <div className="cabecera-marca">
           <span className="marca-icono">
@@ -63,22 +87,7 @@ export function Marco() {
           <strong>ProfeLink</strong>
         </div>
         <div className="cabecera-acciones">
-          <span
-            className="insignia-rol"
-            style={{
-              padding: '0.25rem 0.65rem',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              background: esDocente ? 'rgba(56, 189, 248, 0.15)' : 'rgba(52, 211, 153, 0.15)',
-              color: esDocente ? '#38bdf8' : '#34d399',
-              border: `1px solid ${esDocente ? 'rgba(56, 189, 248, 0.4)' : 'rgba(52, 211, 153, 0.4)'}`,
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-          >
-            {rolEtiqueta}
-          </span>
+          <span className={esDocente ? 'insignia-rol docente' : 'insignia-rol estudiante'}>{rolEtiqueta}</span>
           <button className="cabecera-icono" type="button" aria-label="Reportar un problema" onClick={() => setReporte(true)}>
             <Icono nombre="depurar" />
           </button>
@@ -90,7 +99,7 @@ export function Marco() {
           </NavLink>
         </div>
       </header>
-      <aside className={abierta ? 'barra abierta' : 'barra'}>
+      <aside id="navegacion-principal" className={abierta ? 'barra abierta' : 'barra'}>
         <div className="curso-cabeza">
           <NavLink className="curso-casa" to="/" aria-label="Inicio" onClick={() => setAbierta(false)}>
             <Icono nombre="casa" />

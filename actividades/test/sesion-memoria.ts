@@ -53,6 +53,7 @@ interface ParticipanteMemoria {
   sesionId: string;
   perfilId: string;
   nombre: string;
+  avatarId?: string | null;
   conectado: boolean;
   puntaje: number;
   aciertos: number;
@@ -66,10 +67,12 @@ interface SesionMemoriaFila {
   titulo: string;
   anfitrionId: string;
   anfitrionNombre: string;
-  estado: 'esperando' | 'pregunta' | 'cerrada' | 'finalizada';
+  estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada';
   preguntaActual: number;
   segundos: number;
+  iniciaEn: Date | null;
   cierraEn: Date | null;
+  elegibles: string[];
   preguntasInstantanea: InstantaneaPreguntas | null;
   iniciadaEn: Date | null;
   finalizadaEn: Date | null;
@@ -121,6 +124,8 @@ export class SesionMemoria {
       data: Omit<
         SesionMemoriaFila,
         | 'cierraEn'
+        | 'iniciaEn'
+        | 'elegibles'
         | 'preguntasInstantanea'
         | 'iniciadaEn'
         | 'finalizadaEn'
@@ -137,6 +142,8 @@ export class SesionMemoria {
       const fila: SesionMemoriaFila = {
         ...data,
         cierraEn: null,
+        iniciaEn: null,
+        elegibles: [],
         preguntasInstantanea: null,
         iniciadaEn: null,
         finalizadaEn: null,
@@ -212,7 +219,9 @@ export class SesionMemoria {
         estado: fila.estado,
         preguntaActual: fila.preguntaActual,
         segundos: fila.segundos,
+        iniciaEn: fila.iniciaEn,
         cierraEn: fila.cierraEn,
+        elegibles: fila.elegibles,
         preguntasInstantanea: fila.preguntasInstantanea,
         iniciadaEn: fila.iniciadaEn,
         finalizadaEn: fila.finalizadaEn,
@@ -248,6 +257,7 @@ export class SesionMemoria {
         sesionId: string;
         perfilId: string;
         nombre: string;
+        avatarId?: string;
         conectado: boolean;
       };
     }) => {
@@ -281,7 +291,7 @@ export class SesionMemoria {
       data: Partial<
         Pick<
           ParticipanteMemoria,
-          'nombre' | 'conectado' | 'puntaje' | 'aciertos'
+          'nombre' | 'avatarId' | 'conectado' | 'puntaje' | 'aciertos'
         >
       >;
     }) => {
@@ -294,6 +304,7 @@ export class SesionMemoria {
       if (!fila) throw errorPrisma('P2025');
       const antes = {
         nombre: fila.nombre,
+        avatarId: fila.avatarId,
         conectado: fila.conectado,
         puntaje: fila.puntaje,
         aciertos: fila.aciertos,
