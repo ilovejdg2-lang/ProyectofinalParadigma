@@ -708,6 +708,39 @@
   gap: 14px;
 }
 
+.respuestas-vf {
+  grid-template-columns: 1fr 1fr;
+}
+
+.respuestas-vf .respuesta {
+  min-height: 148px;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+}
+
+.respuestas-vf .es-verdadero { background: #14804a; color: white; }
+.respuestas-vf .es-falso { background: #c0392b; color: white; }
+
+.tipos-pregunta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tipos-pregunta button {
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: inherit;
+  padding: 0 14px;
+}
+
+.tipos-pregunta button[aria-pressed='true'] {
+  background: #2f7cf6;
+  color: white;
+  border-color: transparent;
+}
+
 .escenario-partida .respuesta {
   min-height: 92px;
   border: 0;

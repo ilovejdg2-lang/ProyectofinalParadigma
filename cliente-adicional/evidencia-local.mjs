@@ -98,10 +98,58 @@ async function main() {
 
   const sesionDocente = await entrar(docente)
   const tokenDocente = sesionDocente.token
-  const catalogo = await json(`${actUrl}/cuestionarios`)
-  const lista = Array.isArray(catalogo.cuerpo) ? catalogo.cuerpo : catalogo.cuerpo?.cuestionarios ?? []
-  const conImagen = lista.find((item) => item.id === 'demo-funcional') ?? lista.find((item) => item.imagenUrl)
-  if (!conImagen) throw new Error('El catálogo local no tiene un cuestionario con imagen.')
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  const formulario = new FormData()
+  formulario.append('archivo', new Blob([png], { type: 'image/png' }), 'prueba-clase.png')
+  const subida = await json(`${actUrl}/imagenes`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenDocente}` },
+    body: formulario,
+  })
+  const foto = subida.cuerpo?.url
+  if (subida.estado >= 400 || typeof foto !== 'string' || !foto.includes('/archivos/')) {
+    throw new Error(`No se guardó la foto: ${subida.estado} ${JSON.stringify(subida.cuerpo)}`)
+  }
+  const lecturaFoto = await json(foto)
+  anotar(
+    'foto-subida',
+    lecturaFoto.estado === 200,
+    `La foto quedó en ${foto} y responde ${lecturaFoto.estado}. Esa URL usa la dirección de la red, no un SVG del frontend.`,
+  )
+
+  const creado = await json(`${actUrl}/cuestionarios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenDocente}` },
+    body: JSON.stringify({
+      titulo: 'Prueba de clase con foto',
+      descripcion: 'Cuestionario de prueba con una foto subida al servidor.',
+      categoria: 'General',
+      etiquetas: ['prueba'],
+      dificultad: 'medio',
+      imagenUrl: foto,
+      puntosPorAcierto: 1,
+      preguntas: [
+        {
+          enunciado: 'La foto de esta pregunta se sirve desde la API.',
+          respuestaCorrecta: true,
+          orden: 1,
+          segundos: 30,
+          imagenUrl: foto,
+          opciones: [
+            { id: 'vf-verdadero', texto: 'Verdadero', correcta: true },
+            { id: 'vf-falso', texto: 'Falso', correcta: false },
+          ],
+        },
+      ],
+    }),
+  })
+  if (creado.estado >= 400 || !creado.cuerpo?.id) {
+    throw new Error(`No se creó el cuestionario: ${creado.estado} ${JSON.stringify(creado.cuerpo)}`)
+  }
+  const conImagen = creado.cuerpo
 
   const salaA = await json(`${actUrl}/sesiones-juego`, {
     method: 'POST',
@@ -169,7 +217,29 @@ async function main() {
     method: 'POST',
     headers: { Authorization: `Bearer ${tokenDocente}` },
   })
-  await new Promise((resolve) => setTimeout(resolve, 1500))
+  await new Promise((resolve) => setTimeout(resolve, 5200))
+
+  const preguntaAbierta = inicioA.cuerpo?.preguntas?.[inicioA.cuerpo.preguntaActual ?? 0]
+  const opcionId = preguntaAbierta?.opciones?.[0]?.id
+  let respuestaEstado = 0
+  if (opcionId) {
+    const respuesta = await json(`${actUrl}/sesiones-juego/${codigoA}/respuestas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sesiones[1].token}` },
+      body: JSON.stringify({ opcionId }),
+    })
+    respuestaEstado = respuesta.estado
+  }
+  const cierre = await json(`${actUrl}/sesiones-juego/${codigoA}/cerrar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenDocente}` },
+  })
+  const puntajes = (cierre.cuerpo?.participantes ?? []).map((item) => item.puntaje)
+  anotar(
+    'resultados-un-punto',
+    cierre.estado < 400 && puntajes.length > 0 && puntajes.every((puntos) => puntos === 0 || puntos === 1),
+    `Cierre ${cierre.estado} ${cierre.cuerpo?.mensaje ?? ''}, respuesta ${respuestaEstado}. Puntajes de la pregunta: ${puntajes.join(', ') || 'ninguno'}.`,
+  )
 
   const preguntaA = inicioA.cuerpo?.preguntas?.find((pregunta) => pregunta.imagenUrl)
     ?? canalA.mensajes.map((mensaje) => mensaje.sala).find((sala) => sala?.codigo === codigoA)?.preguntas?.find((pregunta) => pregunta.imagenUrl)
@@ -178,9 +248,7 @@ async function main() {
     const destino = preguntaA.imagenUrl.startsWith('http')
       ? preguntaA.imagenUrl
       : `${frontUrl}${preguntaA.imagenUrl.startsWith('/') ? '' : '/'}${preguntaA.imagenUrl}`
-    if (new URL(destino).hostname === '127.0.0.1' || new URL(destino).hostname === 'localhost') {
-      imagenHttp = (await json(destino)).estado
-    }
+    imagenHttp = (await json(destino)).estado
   }
   anotar(
     'imagen-durante-partida',

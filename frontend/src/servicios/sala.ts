@@ -9,6 +9,7 @@ import type {
   RespuestaParticipante,
   ResumenResultado,
   Sala,
+  ConfiguracionSala,
 } from '../dominio/tipos.ts'
 import {
   calcularProgresoLocal,
@@ -25,7 +26,7 @@ export type EstadoConexion = 'conectado' | 'desconectado' | 'error'
 
 export interface ClienteSala {
   readonly canal: 'simulado' | 'remoto'
-  crear(token: string, cuestionarioId: string): Promise<Sala>
+  crear(token: string, cuestionarioId: string, config?: ConfiguracionSala): Promise<Sala>
   unirse(token: string, codigo: string, ficha?: { nombre?: string; avatarId?: string }): Promise<Sala>
   obtener(token: string, codigo: string): Promise<Sala>
   suscribir(
@@ -189,11 +190,15 @@ export function crearSalaSimulada(
       const enviada = respuesta.enviadaEn ? new Date(respuesta.enviadaEn).getTime() : inicio
       const transcurrido = Math.max(0, enviada - inicio)
       respuesta.milisegundos = transcurrido
-      respuesta.puntos = puntosDeRespuesta(acierto(pregunta, respuesta), transcurrido, limite)
+      respuesta.puntos = puntosDeRespuesta(acierto(pregunta, respuesta), sala.puntosPorAcierto ?? 1)
     }
     for (const participante of sala.participantes) {
       participante.puntaje = participante.respuestas.reduce((suma, item) => suma + item.puntos, 0)
       participante.aciertos = participante.respuestas.filter((item) => item.puntos > 0).length
+      participante.tiempoMs = participante.respuestas.reduce(
+        (suma, item) => suma + (item.puntos > 0 ? (item.milisegundos ?? 0) : 0),
+        0,
+      )
     }
     sala.estado = 'cerrada'
     sala.cierraEn = null
@@ -587,7 +592,8 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
       conexion = 'conectado'
       reabrir?.()
     },
-    crear: (token, cuestionarioId) => enviar(token, '/sesiones-juego', 'POST', { cuestionarioId }),
+    crear: (token, cuestionarioId, config) =>
+      enviar(token, '/sesiones-juego', 'POST', { cuestionarioId, ...config }),
     unirse: (token, codigo, ficha) =>
       enviar(token, `/sesiones-juego/${codigo}/participantes`, 'POST', {
         nombre: ficha?.nombre,

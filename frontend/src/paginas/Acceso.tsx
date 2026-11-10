@@ -8,6 +8,7 @@ import { CONTRASENA_DEMO, CORREO_DEMO } from '../datos/demostracion.ts'
 import { mensajeDe } from '../dominio/errores.ts'
 import { codigoDeInvitacion } from '../componentes/CodigoQr.tsx'
 import { validarAcceso } from '../dominio/validacion.ts'
+import { esEntradaDirecta, leerEspacio, limpiarEspacio } from './espacio.ts'
 
 export function InicioSesion() {
   return <FormularioAcceso registro={false} />
@@ -41,7 +42,13 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
   const [enviando, setEnviando] = useState(false)
   const [recuperar, setRecuperar] = useState(false)
 
-  if (perfil) return <Navigate to={destino} replace />
+  if (perfil) {
+    if (esEntradaDirecta(destino)) return <Navigate to={destino} replace />
+    const espacio = leerEspacio()
+    if (!espacio) return <Navigate to="/elegir" replace />
+    const casa = espacio === 'cursos' ? '/cursos' : '/'
+    return <Navigate to={destino === '/' ? casa : destino} replace />
+  }
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
@@ -53,8 +60,9 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
       const sesion = registro
         ? await autenticacion.registrar({ nombre, correo, contrasena })
         : await autenticacion.iniciarSesion(correo, contrasena)
+      limpiarEspacio()
       entrar(sesion)
-      navegar(destino, { replace: true })
+      navegar(esEntradaDirecta(destino) ? destino : '/elegir', { replace: true })
     } catch (error) {
       setErrores([mensajeDe(error)])
     } finally {

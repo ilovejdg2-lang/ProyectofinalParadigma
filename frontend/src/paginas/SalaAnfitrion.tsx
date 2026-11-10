@@ -118,6 +118,7 @@ export function SalaAnfitrion() {
             </button>
           ) : null}
           {sala.estado === 'finalizada' ? <Link className="boton" to={`/resultados/${sala.codigo}`}>Ver reporte</Link> : null}
+          {sala.estado === 'finalizada' && sala.evaluacion ? <Link className="boton" to={`/evaluaciones/${sala.codigo}`}>Resultados de la evaluación</Link> : null}
           {sala.estado === 'pregunta' && !enCuenta ? (
             <button className="boton-fantasma" type="button" disabled={ocupado} onClick={() => token && void accion(() => cliente.cerrarPregunta(token, sala.codigo))}>
               Cerrar pregunta
@@ -156,6 +157,8 @@ export function SalaAnfitrion() {
                 <span className="pastilla viva">{canal}</span>
               </div>
               <p className="pastilla">{sala.titulo}</p>
+              {sala.evaluacion ? <p className="pastilla">Evaluación · {sala.evaluacion.cursoNombre} · vale {sala.evaluacion.valorPorcentaje}%</p> : null}
+              {sala.evaluacion ? <p>Solo entra quien pertenece a {sala.evaluacion.cursoNombre}.</p> : null}
               <p>Comparte este código con tu grupo:</p>
               <p className="pin-gigante" data-testid="codigo-sala">
                 {sala.codigo.split('').map((letra, indice) => (

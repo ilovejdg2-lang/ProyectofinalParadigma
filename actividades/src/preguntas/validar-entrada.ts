@@ -21,6 +21,7 @@ export interface CuestionarioEntrada {
   etiquetas: string[];
   dificultad: 'facil' | 'medio' | 'dificil';
   imagenUrl?: string;
+  puntosPorAcierto?: number;
   preguntas: PreguntaEntrada[];
 }
 

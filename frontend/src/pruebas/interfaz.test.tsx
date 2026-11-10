@@ -37,6 +37,7 @@ function renderEn(ruta: string, servicios: Servicios) {
 async function entrarDemo(servicios: Servicios) {
   const sesion = await servicios.autenticacion.iniciarSesion(CORREO_DEMO, CONTRASENA_DEMO)
   sessionStorage.setItem('profelink.token', sesion.token)
+  sessionStorage.setItem('profelink.espacio', 'cuestionarios')
   return sesion
 }
 
@@ -59,6 +60,8 @@ describe('acceso', () => {
     await usuario.type(await screen.findByLabelText('Correo electrónico'), CORREO_DEMO)
     await usuario.type(screen.getByLabelText('Contraseña'), CONTRASENA_DEMO)
     await usuario.click(screen.getByRole('button', { name: 'Iniciar Sesión' }))
+    expect(await screen.findByRole('heading', { name: '¿Qué quieres ver?' })).toBeInTheDocument()
+    await usuario.click(screen.getByRole('button', { name: /Cuestionarios/ }))
     expect(await screen.findByRole('heading', { name: 'Evaluaciones en vivo' })).toBeInTheDocument()
   })
 

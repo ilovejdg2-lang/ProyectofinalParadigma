@@ -58,6 +58,7 @@ export interface Cuestionario {
   preguntas: Pregunta[]
   imagenUrl?: string
   esDemostracion: boolean
+  puntosPorAcierto?: number
   actualizadoEn: string
 }
 
@@ -70,6 +71,7 @@ export interface BorradorPregunta {
   id: string
   enunciado: string
   respuestaCorrecta: boolean | null
+  tipo: 'vf' | 'opciones'
   opciones: BorradorOpcion[]
   opcionCorrectaId: string | null
   imagenUrl?: string
@@ -85,6 +87,7 @@ export interface BorradorCuestionario {
   dificultad: Dificultad
   imagenUrl?: string
   imagenSimulada: boolean
+  puntosPorAcierto: number
   preguntas: BorradorPregunta[]
 }
 
@@ -109,6 +112,7 @@ export interface Participante {
   conectado: boolean
   puntaje: number
   aciertos: number
+  tiempoMs?: number
   respuestas: RespuestaParticipante[]
 }
 
@@ -122,6 +126,7 @@ export interface Sala {
   estado: EstadoSala
   preguntaActual: number
   segundos: number
+  puntosPorAcierto?: number
   iniciaEn?: string | null
   cierraEn: string | null
   elegibles?: string[]
@@ -129,6 +134,23 @@ export interface Sala {
   participantes: Participante[]
   preguntas: Pregunta[]
   canal: 'simulado' | 'remoto'
+  evaluacion?: {
+    cursoId: string
+    cursoNombre: string
+    nombre: string
+    notaMaxima: number
+    valorPorcentaje: number
+    notaMinima: number
+  }
+}
+
+export interface ConfiguracionSala {
+  modo: 'practica' | 'evaluacion'
+  cursoId?: string
+  nombreEvaluacion?: string
+  notaMaxima?: number
+  valorPorcentaje?: number
+  notaMinima?: number
 }
 
 export interface ResultadoImagen {

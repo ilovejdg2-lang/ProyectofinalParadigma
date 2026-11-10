@@ -1,9 +1,9 @@
-/** Misma fórmula que el servidor: 500 por acertar y hasta 500 por rapidez. */
-export function puntosDeRespuesta(acierto: boolean, transcurridoMs: number, limiteMs: number): number {
+/** Un acierto vale los puntos del cuestionario. Por defecto es 1. El error vale 0. */
+export function puntosDeRespuesta(acierto: boolean, puntosPorAcierto = 1): number {
   if (!acierto) return 0
-  if (!(limiteMs > 0)) return 500
-  const razon = Math.min(1, Math.max(0, transcurridoMs / limiteMs))
-  return Math.min(1000, Math.max(500, Math.round(500 + 500 * (1 - razon))))
+  const puntos = Math.round(puntosPorAcierto)
+  if (!Number.isInteger(puntos) || puntos < 1) return 1
+  return Math.min(100, puntos)
 }
 
 export function formatoPuntos(valor: number) {

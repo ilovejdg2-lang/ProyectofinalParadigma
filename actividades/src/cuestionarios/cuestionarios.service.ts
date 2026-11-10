@@ -28,6 +28,7 @@ import {
   FilaPregunta,
   presentar,
 } from './presentacion';
+import { puntosPorAciertoDe } from '../sesiones-juego/calificacion';
 import { PrismaService } from '../prisma/prisma.service';
 
 const MENSAJE_PARTIDA_ACTIVA =
@@ -138,6 +139,7 @@ export class CuestionariosService {
           etiquetas: etiquetasDe(preparada),
           dificultad: preparada.dificultad,
           esDemostracion: false,
+          puntosPorAcierto: puntosPorAciertoDe(preparada.puntosPorAcierto),
           imagenId,
         },
       });
@@ -169,6 +171,7 @@ export class CuestionariosService {
           categoria: preparada.categoria.trim(),
           etiquetas: etiquetasDe(preparada),
           dificultad: preparada.dificultad,
+          puntosPorAcierto: puntosPorAciertoDe(preparada.puntosPorAcierto),
           imagenId,
         },
       });

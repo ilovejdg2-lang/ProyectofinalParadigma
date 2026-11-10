@@ -34,7 +34,14 @@ export class SesionesJuegoController {
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
     exigirDocente(identidad);
-    return this.sesiones.crear(entrada.cuestionarioId, identidad);
+    return this.sesiones.crear(entrada.cuestionarioId, identidad, {
+      modo: entrada.modo,
+      cursoId: entrada.cursoId,
+      nombreEvaluacion: entrada.nombreEvaluacion,
+      notaMaxima: entrada.notaMaxima,
+      valorPorcentaje: entrada.valorPorcentaje,
+      notaMinima: entrada.notaMinima,
+    });
   }
 
   @Get('sesiones-juego/:codigo')

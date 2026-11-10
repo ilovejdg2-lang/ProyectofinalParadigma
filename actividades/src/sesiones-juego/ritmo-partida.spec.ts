@@ -45,17 +45,13 @@ async function partida() {
   return { ...contexto, codigo: sala.codigo };
 }
 
-describe('puntos por precisión y rapidez', () => {
-  it('sigue la tabla de 20 segundos y anula el error rápido', () => {
-    const limite = 20_000;
-    expect(puntosDeRespuesta(true, 2_000, limite)).toBe(950);
-    expect(puntosDeRespuesta(true, 5_000, limite)).toBe(875);
-    expect(puntosDeRespuesta(true, 10_000, limite)).toBe(750);
-    expect(puntosDeRespuesta(true, 15_000, limite)).toBe(625);
-    expect(puntosDeRespuesta(true, 20_000, limite)).toBe(500);
-    expect(puntosDeRespuesta(false, 3_000, limite)).toBe(0);
-    expect(puntosDeRespuesta(true, 0, limite)).toBe(1000);
-    expect(puntosDeRespuesta(true, 25_000, limite)).toBe(500);
+describe('puntos por acierto', () => {
+  it('da los puntos configurados y cero si falla', () => {
+    expect(puntosDeRespuesta(true)).toBe(1);
+    expect(puntosDeRespuesta(true, 4)).toBe(4);
+    expect(puntosDeRespuesta(false, 4)).toBe(0);
+    expect(puntosDeRespuesta(true, 0)).toBe(1);
+    expect(puntosDeRespuesta(true, 500)).toBe(100);
   });
 });
 
@@ -75,7 +71,7 @@ describe('cierre, gráfica y avance de la partida', () => {
     expect(Date.now() - antes).toBeLessThan(10_000);
     expect(memoria.sesiones[0].cierraEn).toBeNull();
     expect(
-      cerrada.participantes.every((item) => (item.puntaje ?? 0) >= 500),
+      cerrada.participantes.every((item) => (item.puntaje ?? 0) >= 1),
     ).toBe(true);
   });
 
@@ -104,7 +100,7 @@ describe('cierre, gráfica y avance de la partida', () => {
     const rapida = cerrada.participantes.find(
       (item) => item.perfilId === estudiantes[0].id,
     );
-    expect(rapida?.puntaje).toBeGreaterThanOrEqual(500);
+    expect(rapida?.puntaje).toBe(1);
   });
 
   it('paga más al acierto rápido y cero al error rápido', async () => {
@@ -133,9 +129,12 @@ describe('cierre, gráfica y avance de la partida', () => {
     const cerrada = await servicio.obtener(codigo, ana);
     const puntos = (perfil: string) =>
       cerrada.participantes.find((item) => item.perfilId === perfil)?.puntaje;
-    expect(puntos(estudiantes[0].id)).toBe(950);
-    expect(puntos(estudiantes[1].id)).toBe(750);
+    expect(puntos(estudiantes[0].id)).toBe(1);
+    expect(puntos(estudiantes[1].id)).toBe(1);
     expect(puntos(estudiantes[2].id)).toBe(0);
+    const tiempo = (perfil: string) =>
+      cerrada.participantes.find((item) => item.perfilId === perfil)?.tiempoMs ?? 0;
+    expect(tiempo(estudiantes[0].id)).toBeLessThan(tiempo(estudiantes[1].id));
     expect(puntos(estudiantes[3].id)).toBe(0);
     const correcta = cerrada.preguntas[0].opciones.find((item) => item.correcta);
     expect(correcta?.id).toBe('p1a');
