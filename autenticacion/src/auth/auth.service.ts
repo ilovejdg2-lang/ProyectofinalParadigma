@@ -15,11 +15,15 @@ import { PerfilPublico, TokensRespuesta } from '../dominio/tipos';
 import {
   ActualizarPerfilDto,
   CambiarPasswordDto,
+  extraerCodigoRecuperacion,
+  extraerEmailRecuperacion,
   extraerNombreActualizar,
   extraerPasswordActual,
   extraerPasswordNueva,
   extraerRefreshToken,
   RefreshDto,
+  RestablecerPasswordDto,
+  SolicitarRecuperacionDto,
 } from './dto/varios.dto';
 import {
   extraerEmailRegistro,
@@ -61,6 +65,7 @@ export class AuthService {
       correo: u.email,
       rol: u.role,
       emailVerificado: u.emailVerified,
+      creadoEn: u.createdAt?.toISOString?.() ?? undefined,
     };
   }
 
@@ -261,6 +266,67 @@ export class AuthService {
 
     this.logger.log(`Contraseña actualizada para el usuario ${usuario.email}. Todas las sesiones anteriores fueron revocadas.`);
     return { mensaje: 'Contraseña actualizada exitosamente.' };
+  }
+
+  async solicitarRecuperacion(
+    datos: SolicitarRecuperacionDto,
+  ): Promise<{ mensaje: string; codigo?: string }> {
+    let email: string;
+    try {
+      email = extraerEmailRecuperacion(datos);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+
+    const mensaje =
+      'Si el correo está registrado, usa el código de recuperación para definir una nueva contraseña.';
+    const usuario = await this.almacen.buscarPorEmail(email);
+    if (!usuario || usuario.status === 'Locked') {
+      return { mensaje };
+    }
+
+    const codigo = this.generarTokenOpaco();
+    await this.almacen.guardarVerificationToken({
+      id: crypto.randomUUID(),
+      userId: usuario.id,
+      tokenHash: this.hashearToken(`reset:${codigo}`),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      createdAt: new Date(),
+    });
+
+    this.logger.log(`[Password Recovery] Código para ${email}: ${codigo}`);
+    // Sin SMTP en el proyecto: devolvemos el código para completar el flujo en UI.
+    return { mensaje, codigo };
+  }
+
+  async restablecerPassword(datos: RestablecerPasswordDto): Promise<{ mensaje: string }> {
+    let codigo: string;
+    let nuevaContrasena: string;
+    try {
+      codigo = extraerCodigoRecuperacion(datos);
+      nuevaContrasena = extraerPasswordNueva(datos);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+
+    const entidad = await this.almacen.buscarVerificationToken(this.hashearToken(`reset:${codigo}`));
+    if (!entidad || entidad.usedAt || entidad.expiresAt < new Date()) {
+      throw new BadRequestException('El código de recuperación no es válido o ha expirado.');
+    }
+
+    const usuario = await this.almacen.buscarPorId(entidad.userId);
+    if (!usuario || usuario.status === 'Locked') {
+      throw new BadRequestException('El código de recuperación no es válido o ha expirado.');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(nuevaContrasena, salt);
+    await this.almacen.actualizarUsuario(usuario.id, { passwordHash });
+    await this.almacen.marcarVerificationTokenUsado(entidad.id);
+    await this.almacen.revocarTodasLasSesiones(usuario.id);
+
+    this.logger.log(`Contraseña restablecida para ${usuario.email}. Sesiones anteriores revocadas.`);
+    return { mensaje: 'Contraseña actualizada. Ya puedes iniciar sesión.' };
   }
 
   private async emitirTokens(usuario: UsuarioEntidad, ip?: string): Promise<TokensRespuesta> {

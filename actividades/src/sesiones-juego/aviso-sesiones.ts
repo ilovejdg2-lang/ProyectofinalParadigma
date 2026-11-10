@@ -4,8 +4,10 @@ export type CambioSesion =
   | 'partida-iniciada'
   | 'respuesta-aceptada'
   | 'pregunta-cerrada'
+  | 'clasificacion-mostrada'
   | 'pregunta-cambiada'
-  | 'sesion-finalizada';
+  | 'sesion-finalizada'
+  | 'presencia-actualizada';
 
 export interface AvisoConfirmado {
   tipo: CambioSesion;

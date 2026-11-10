@@ -1,17 +1,33 @@
-import { ValidationPipe } from '@nestjs/common';
+import { shutdownTelemetry } from './instrumentation.js';
+import type { Server } from 'node:http';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
+  const server = app.getHttpServer() as Server;
+  server.once('close', () => {
+    void shutdownTelemetry().catch((error: unknown) => {
+      Logger.error('Error shutting down OpenTelemetry', error, 'Bootstrap');
+    });
+  });
 
   const allowedOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map((o) => o.trim())
     : ['http://localhost:5173'];
+  const origenLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+      if (!origin || allowedOrigins.includes(origin) || origenLocal.test(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

@@ -11,6 +11,8 @@ coverage/
 .env.*
 !.env.example
 !.env.production.example
+!.env.local.example
+.local/
 *.key
 datos/keys/
 datos/keys-test/

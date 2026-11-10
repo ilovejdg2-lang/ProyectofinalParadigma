@@ -1,3 +1,5 @@
+import { OPCIONES_MULTIPLES } from './opciones-multiples';
+
 export type DificultadBanco = 'facil' | 'medio' | 'dificil';
 
 export type ModoJuego = 'en-vivo' | 'practica' | 'evaluacion' | 'desafio';
@@ -140,6 +142,43 @@ export function opcionesVerdaderoFalso(
   ];
 }
 
+export function opcionesComoKahoot(
+  preguntaId: string,
+  respuestaCorrecta: boolean,
+  correcta: string,
+  distractores: [string, string, string],
+): OpcionSemilla[] {
+  const [primero, segundo, tercero] = distractores;
+  const textoVerdadero = respuestaCorrecta ? correcta : primero;
+  const textoFalso = respuestaCorrecta ? primero : correcta;
+  return [
+    {
+      id: `${preguntaId}:verdadero`,
+      texto: textoVerdadero,
+      orden: 1,
+      correcta: respuestaCorrecta,
+    },
+    {
+      id: `${preguntaId}:falso`,
+      texto: textoFalso,
+      orden: 2,
+      correcta: !respuestaCorrecta,
+    },
+    {
+      id: `${preguntaId}:c`,
+      texto: segundo,
+      orden: 3,
+      correcta: false,
+    },
+    {
+      id: `${preguntaId}:d`,
+      texto: tercero,
+      orden: 4,
+      correcta: false,
+    },
+  ];
+}
+
 export function crearPreguntaBanco(params: {
   id: string;
   orden: number;
@@ -155,10 +194,11 @@ export function crearPreguntaBanco(params: {
   imagenUrl?: string;
   opciones?: OpcionSemilla[];
 }): PreguntaSemilla {
+  const paquete = OPCIONES_MULTIPLES[params.id];
   return {
     id: params.id,
     orden: params.orden,
-    enunciado: params.enunciado,
+    enunciado: paquete?.enunciado ?? params.enunciado,
     respuestaCorrecta: params.respuestaCorrecta,
     segundos: params.segundos ?? null,
     categoria: params.categoria,
@@ -170,7 +210,14 @@ export function crearPreguntaBanco(params: {
     imagenUrl: params.imagenUrl,
     opciones:
       params.opciones ??
-      opcionesVerdaderoFalso(params.id, params.respuestaCorrecta),
+      (paquete
+        ? opcionesComoKahoot(
+            params.id,
+            params.respuestaCorrecta,
+            paquete.correcta,
+            paquete.distractores,
+          )
+        : opcionesVerdaderoFalso(params.id, params.respuestaCorrecta)),
   };
 }
 

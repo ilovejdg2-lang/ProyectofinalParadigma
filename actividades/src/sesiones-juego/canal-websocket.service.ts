@@ -12,6 +12,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { VerificadorIdentidad } from '../autenticacion/verificador-identidad';
 import { IdentidadExterna } from '../autenticacion/identidad-externa';
 import { AvisoConfirmado, AvisoSesiones } from './aviso-sesiones';
+import { presentarSala } from './presentacion-sala';
 import { SesionesJuegoService } from './sesiones-juego.service';
 
 interface ClienteConectado {
@@ -19,6 +20,7 @@ interface ClienteConectado {
   codigo: string;
   usuarioId?: string;
   nombre?: string;
+  respondio: boolean;
 }
 
 @Injectable()
@@ -29,6 +31,7 @@ export class CanalWebSocketService
   private wss: WebSocketServer | null = null;
   private salas = new Map<string, Set<ClienteConectado>>();
   private sesiones!: SesionesJuegoService;
+  private latido: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -55,14 +58,30 @@ export class CanalWebSocketService
       },
     );
 
+    this.latido = setInterval(() => this.revisarLatido(), 5_000);
     this.logger.log(
       'Canal WebSocket de ProfeLink montado en /canal y / con soporte de salas.',
     );
   }
 
   onModuleDestroy() {
+    if (this.latido) clearInterval(this.latido);
     this.wss?.close();
     this.salas.clear();
+  }
+
+  private revisarLatido(): void {
+    for (const clientes of this.salas.values()) {
+      for (const cliente of clientes) {
+        if (cliente.ws.readyState !== WebSocket.OPEN) continue;
+        if (!cliente.respondio) {
+          cliente.ws.terminate();
+          continue;
+        }
+        cliente.respondio = false;
+        cliente.ws.ping();
+      }
+    }
   }
 
   private async autorizarYActualizar(
@@ -144,7 +163,11 @@ export class CanalWebSocketService
       codigo,
       usuarioId: identidad?.id,
       nombre: identidad?.nombre,
+      respondio: true,
     };
+    ws.on('pong', () => {
+      cliente.respondio = true;
+    });
 
     if (codigo) {
       if (!this.salas.has(codigo)) {
@@ -154,15 +177,22 @@ export class CanalWebSocketService
       this.logger.log(
         `Cliente conectado a sala [${codigo}] (Total: ${this.salas.get(codigo)!.size})`,
       );
+      void this.presencia(codigo, identidad.id, true);
     }
 
     ws.on('close', () => {
       if (codigo && this.salas.has(codigo)) {
         const conjunto = this.salas.get(codigo)!;
         conjunto.delete(cliente);
+        const sigue = [...conjunto].some(
+          (item) =>
+            item.usuarioId === cliente.usuarioId &&
+            item.ws.readyState === WebSocket.OPEN,
+        );
         if (conjunto.size === 0) {
           this.salas.delete(codigo);
         }
+        if (!sigue) void this.presencia(codigo, cliente.usuarioId, false);
         this.logger.log(`Cliente desconectado de sala [${codigo}]`);
       }
     });
@@ -181,6 +211,27 @@ export class CanalWebSocketService
         timestamp: new Date().toISOString(),
       }),
     );
+  }
+
+  clientesDe(codigo: string): ClienteConectado[] {
+    return [...(this.salas.get(codigo.trim().toUpperCase()) ?? [])];
+  }
+
+  private async presencia(
+    codigo: string,
+    perfilId: string | undefined,
+    conectado: boolean,
+  ): Promise<void> {
+    if (!perfilId) return;
+    const marcar = this.sesiones.marcarPresencia;
+    if (typeof marcar !== 'function') return;
+    try {
+      await marcar.call(this.sesiones, codigo, perfilId, conectado);
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo actualizar la presencia en [${codigo}]: ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+    }
   }
 
   emitirASala(codigo: string, mensaje: Record<string, unknown>) {
@@ -215,28 +266,26 @@ export class AvisoSesionesCanal extends AvisoSesiones {
       const sesiones = this.moduleRef.get(SesionesJuegoService, {
         strict: false,
       });
-      const sala = sesiones
-        ? await sesiones
-            .obtener(codigo, {
-              id: 'sistema',
-              nombre: 'Sistema',
-            })
-            .catch(() => null)
+      const fila = sesiones
+        ? await sesiones.leerParaEmision(codigo).catch(() => null)
         : null;
 
-      if (sala) {
-        // Formato esperado directamente por el frontend (datos.sala)
-        this.canal.emitirASala(codigo, {
-          sala,
-          aviso,
-        });
-
-        // Evento tipado adicional según especificación
-        this.canal.emitirASala(codigo, {
+      if (fila) {
+        const evento = {
           evento: this.mapearEvento(aviso.tipo),
           codigo,
           ocurridoEn: aviso.ocurridoEn,
-        });
+        };
+        for (const cliente of this.canal.clientesDe(codigo)) {
+          if (cliente.ws.readyState !== WebSocket.OPEN) continue;
+          cliente.ws.send(
+            JSON.stringify({
+              sala: presentarSala(fila, cliente.usuarioId),
+              aviso,
+            }),
+          );
+        }
+        this.canal.emitirASala(codigo, evento);
       }
     } catch (error) {
       this.logger.warn(
@@ -257,10 +306,14 @@ export class AvisoSesionesCanal extends AvisoSesiones {
         return 'AnswerAccepted';
       case 'pregunta-cerrada':
         return 'QuestionClosed';
+      case 'clasificacion-mostrada':
+        return 'LeaderboardShown';
       case 'pregunta-cambiada':
         return 'QuestionShown';
       case 'sesion-finalizada':
         return 'GameEnded';
+      case 'presencia-actualizada':
+        return 'PresenceChanged';
       default:
         return 'StateSnapshot';
     }

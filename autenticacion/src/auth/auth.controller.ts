@@ -21,6 +21,8 @@ import {
   ActualizarPerfilDto,
   CambiarPasswordDto,
   RefreshDto,
+  RestablecerPasswordDto,
+  SolicitarRecuperacionDto,
   VerificarEmailDto,
 } from './dto/varios.dto';
 
@@ -119,6 +121,19 @@ export class AuthController {
   }
 
   // 6. Actualizar perfil (PATCH /me)
+  @Patch('perfiles/actual')
+  async actualizarFrontend(
+    @Body() datos: ActualizarPerfilDto,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    const token = extraerTokenBearer(authHeader);
+    if (!token) throw new UnauthorizedException({ mensaje: 'No autorizado.' });
+    const claims = this.keys.verificarAccessToken(token);
+    if (!claims) throw new UnauthorizedException({ mensaje: 'Token inválido o expirado.' });
+    const perfil = await this.auth.actualizarPerfil(claims.sub, datos);
+    return { token, perfil };
+  }
+
   @Patch('api/v1/auth/me')
   async actualizarMe(
     @Body() datos: ActualizarPerfilDto,
@@ -169,6 +184,31 @@ export class AuthController {
   @HttpCode(200)
   verificarEmail(@Body() datos: VerificarEmailDto) {
     return this.auth.verificarEmail(datos.token);
+  }
+
+  // 8b. Recuperación de contraseña
+  @Post('api/v1/auth/forgot-password')
+  @HttpCode(200)
+  solicitarRecuperacionStandard(@Body() datos: SolicitarRecuperacionDto) {
+    return this.auth.solicitarRecuperacion(datos);
+  }
+
+  @Post('recuperacion')
+  @HttpCode(200)
+  solicitarRecuperacionFrontend(@Body() datos: SolicitarRecuperacionDto) {
+    return this.auth.solicitarRecuperacion(datos);
+  }
+
+  @Post('api/v1/auth/reset-password')
+  @HttpCode(200)
+  restablecerPasswordStandard(@Body() datos: RestablecerPasswordDto) {
+    return this.auth.restablecerPassword(datos);
+  }
+
+  @Post('recuperacion/restablecer')
+  @HttpCode(200)
+  restablecerPasswordFrontend(@Body() datos: RestablecerPasswordDto) {
+    return this.auth.restablecerPassword(datos);
   }
 
   // 8. JWKS RFC 7517

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 
 export function EstadoCarga({ texto = 'Cargando…' }: { texto?: string }) {
   return (
@@ -49,6 +49,15 @@ export function Dialogo({
   onConfirmar: () => void
   onCancelar: () => void
 }) {
+  useEffect(() => {
+    if (!abierto) return
+    function alTeclado(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') onCancelar()
+    }
+    window.addEventListener('keydown', alTeclado)
+    return () => window.removeEventListener('keydown', alTeclado)
+  }, [abierto, onCancelar])
+
   if (!abierto) return null
   return (
     <div className="dialogo" role="dialog" aria-modal="true" aria-labelledby="titulo-dialogo">

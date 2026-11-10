@@ -121,6 +121,18 @@ describe('AuthService & Dominio de Políticas de Correo', () => {
   });
 
   describe('3. Registro, Autenticación y Cuentas Semilla', () => {
+    it('inicia sesión con la cuenta de la interfaz docente.demo', async () => {
+      const res = await authService.iniciarSesion({
+        correo: 'docente.demo@profelink.test',
+        contrasena: 'Demo-2026',
+      } as any);
+
+      expect(res.token).toBeDefined();
+      expect(res.perfil.id).toBe('perfil-demo');
+      expect(res.perfil.rol).toBe('teacher');
+      expect(res.perfil.correo).toBe('docente.demo@profelink.test');
+    });
+
     it('inicia sesión con el docente demo sembrado', async () => {
       const res = await authService.iniciarSesion({
         correo: 'profesor@una.cr',
@@ -226,6 +238,27 @@ describe('AuthService & Dominio de Políticas de Correo', () => {
           contrasena: 'Profesor123!',
         } as any),
       ).rejects.toThrow('Correo o contraseña incorrectos.');
+    });
+  });
+
+  describe('6. Recuperación de Contraseña', () => {
+    it('solicita un código y restablece la contraseña sin sesión activa', async () => {
+      const solicitud = await authService.solicitarRecuperacion({
+        correo: 'estudiante@est.una.ac.cr',
+      } as any);
+      expect(solicitud.codigo).toBeDefined();
+
+      const resultado = await authService.restablecerPassword({
+        codigo: solicitud.codigo,
+        nuevaContrasena: 'EstudianteNueva2026!',
+      } as any);
+      expect(resultado.mensaje).toContain('Contraseña actualizada');
+
+      const sesion = await authService.iniciarSesion({
+        correo: 'estudiante@est.una.ac.cr',
+        contrasena: 'EstudianteNueva2026!',
+      } as any);
+      expect(sesion.token).toBeDefined();
     });
   });
 });

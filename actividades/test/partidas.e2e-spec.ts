@@ -91,10 +91,12 @@ describe('Partidas y resultados (e2e)', () => {
       .set('Authorization', 'Bearer token-luis')
       .send({ opcionId: 'p1a' })
       .expect(201);
-    expect(JSON.stringify(respondida.body)).not.toContain('correcta');
-    expect(
-      comoSala(respondida.body).participantes[0].respuestas[0].puntos,
-    ).toBe(0);
+    const trasRespuesta = comoSala(respondida.body);
+    expect(trasRespuesta.estado).toBe('cerrada');
+    expect(trasRespuesta.participantes[0].respuestas[0].puntos).toBeGreaterThanOrEqual(
+      500,
+    );
+    expect(JSON.stringify(respondida.body)).toContain('correcta');
 
     await http
       .post(`/sesiones-juego/${codigo}/respuestas`)
@@ -109,13 +111,14 @@ describe('Partidas y resultados (e2e)', () => {
       .send({})
       .expect(403);
 
-    const cerrada = await http
+    await http
       .post(`/sesiones-juego/${codigo}/cerrar`)
       .set('Authorization', 'Bearer token-ana')
       .send({})
-      .expect(201);
-    expect(comoSala(cerrada.body).participantes[0].puntaje).toBe(1);
-    expect(comoSala(cerrada.body).preguntas[1].enunciado).toBe('');
+      .expect(409)
+      .expect({ mensaje: 'No hay una pregunta abierta.' });
+    expect(trasRespuesta.participantes[0].puntaje).toBeGreaterThanOrEqual(500);
+    expect(trasRespuesta.preguntas[1].enunciado).toBe('');
 
     await http
       .get(`/resultados/${codigo}`)
@@ -131,7 +134,17 @@ describe('Partidas y resultados (e2e)', () => {
       .send({})
       .expect(201);
     await http
+      .post(`/sesiones-juego/${codigo}/avanzar`)
+      .set('Authorization', 'Bearer token-ana')
+      .send({})
+      .expect(201);
+    await http
       .post(`/sesiones-juego/${codigo}/cerrar`)
+      .set('Authorization', 'Bearer token-ana')
+      .send({})
+      .expect(201);
+    await http
+      .post(`/sesiones-juego/${codigo}/avanzar`)
       .set('Authorization', 'Bearer token-ana')
       .send({})
       .expect(201);
@@ -164,9 +177,9 @@ describe('Partidas y resultados (e2e)', () => {
     });
     expect(cuerpo.participantes[0]).toMatchObject({
       perfilId: 'luis',
-      puntaje: 1,
       aciertos: 1,
     });
+    expect(cuerpo.participantes[0].puntaje).toBeGreaterThanOrEqual(500);
 
     const historial = await http
       .get('/resultados')

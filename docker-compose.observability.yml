@@ -1,4 +1,14 @@
 services:
+  auth-service:
+    environment:
+      OTEL_SERVICE_NAME: auth-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+    depends_on:
+      otel-lgtm:
+        condition: service_started
+
   actividades:
     environment:
       NODE_OPTIONS: --require=./dist/instrumentation.js

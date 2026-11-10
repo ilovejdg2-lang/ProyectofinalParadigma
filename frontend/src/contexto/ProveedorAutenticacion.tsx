@@ -38,6 +38,12 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
         setPerfil(sesion.perfil)
         setToken(sesion.token)
       })
+      .catch(() => {
+        if (!activo) return
+        sessionStorage.removeItem(CLAVE_TOKEN)
+        setPerfil(null)
+        setToken(null)
+      })
       .finally(() => {
         if (activo) setListo(true)
       })

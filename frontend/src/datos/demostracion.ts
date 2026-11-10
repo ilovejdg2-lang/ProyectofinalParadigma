@@ -1,4 +1,5 @@
 import type { Cuestionario, DefinicionModo, Pregunta, ResumenResultado } from '../dominio/tipos.ts'
+import { OPCIONES_MULTIPLES } from './opciones-multiples.ts'
 
 export const CORREO_DEMO = 'docente.demo@profelink.test'
 export const CONTRASENA_DEMO = 'Demo-2026'
@@ -49,15 +50,34 @@ function preguntaVF(
   respuestaCorrecta: boolean,
   extras?: Partial<Pregunta>,
 ): Pregunta {
+  const paquete = OPCIONES_MULTIPLES[id]
+  const distractores = paquete?.distractores
+  const textoVerdadero = paquete
+    ? respuestaCorrecta
+      ? paquete.correcta
+      : distractores![0]
+    : 'Verdadero'
+  const textoFalso = paquete
+    ? respuestaCorrecta
+      ? distractores![0]
+      : paquete.correcta
+    : 'Falso'
   return {
     id,
     orden,
-    enunciado,
+    enunciado: paquete?.enunciado ?? enunciado,
     respuestaCorrecta,
-    opciones: [
-      { id: `${id}:verdadero`, texto: 'Verdadero', correcta: respuestaCorrecta },
-      { id: `${id}:falso`, texto: 'Falso', correcta: !respuestaCorrecta },
-    ],
+    opciones: paquete
+      ? [
+          { id: `${id}:verdadero`, texto: textoVerdadero, correcta: respuestaCorrecta },
+          { id: `${id}:falso`, texto: textoFalso, correcta: !respuestaCorrecta },
+          { id: `${id}:c`, texto: distractores![1], correcta: false },
+          { id: `${id}:d`, texto: distractores![2], correcta: false },
+        ]
+      : [
+          { id: `${id}:verdadero`, texto: 'Verdadero', correcta: respuestaCorrecta },
+          { id: `${id}:falso`, texto: 'Falso', correcta: !respuestaCorrecta },
+        ],
     ...extras,
   }
 }

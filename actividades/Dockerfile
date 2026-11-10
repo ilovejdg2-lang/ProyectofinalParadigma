@@ -5,7 +5,8 @@ COPY package*.json ./
 COPY prisma.config.ts ./
 COPY prisma ./prisma/
 
-RUN npm ci
+# El lockfile lo resolvió npm 11.21.2. npm 10, el de node:22-alpine, lo rechaza.
+RUN npm install -g npm@11.21.2 && npm ci
 
 COPY nest-cli.json ./
 COPY tsconfig*.json ./

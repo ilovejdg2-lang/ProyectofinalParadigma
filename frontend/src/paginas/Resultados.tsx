@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { EstadoCarga, EstadoError } from '../componentes/Interfaz.tsx'
+import { Podio } from '../componentes/Podio.tsx'
+import { ControlesAudio } from '../juego/ControlesAudio.tsx'
+import { FondoJuego } from '../juego/FondoJuego.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
 import { mensajeDe } from '../dominio/errores.ts'
@@ -36,11 +39,13 @@ export function Resultados() {
   const puesto = mio ? orden.indexOf(mio) + 1 : null
 
   return (
-    <section>
+    <section className="escenario">
+      <FondoJuego />
+      <ControlesAudio paisaje="victoria" />
       <header className="encabezado-pagina">
         <div>
           <h1>{resultado.titulo}</h1>
-          <p>Clasificación de la sesión {resultado.codigo}. El puntaje lo informa el servicio: 1 por acierto y 0 por error o falta de respuesta.</p>
+          <p>Clasificación de la sesión {resultado.codigo}. Cada acierto vale de 500 a 1,000 puntos según la rapidez. Un error o una respuesta ausente vale 0.</p>
         </div>
       </header>
       {puesto && mio ? (
@@ -51,17 +56,7 @@ export function Resultados() {
           </p>
         </article>
       ) : null}
-      <div className="clasificacion">
-        {orden.map((participante, indice) => (
-          <article className={participante.perfilId === perfil?.id ? 'puesto mio' : 'puesto'} key={participante.id}>
-            <span className="lugar">{indice + 1}</span>
-            <strong>{participante.nombre}</strong>
-            <span>
-              {participante.puntaje} pts · {participante.aciertos} aciertos
-            </span>
-          </article>
-        ))}
-      </div>
+      <Podio participantes={orden} perfilId={perfil?.id} />
       <div className="acciones">
         <Link className="boton" to="/">
           Volver al inicio

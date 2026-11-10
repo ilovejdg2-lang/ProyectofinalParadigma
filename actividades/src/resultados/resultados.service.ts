@@ -236,7 +236,7 @@ export class ResultadosService {
         });
       }
       return recargada;
-    });
+    }, { maxWait: 10_000, timeout: 20_000 });
 
     const [resumen] = deduplicarYValidarHistorial([guardada]);
     return resumen ?? presentarResultado(guardada);
@@ -377,5 +377,6 @@ interface ClienteResultadosPersistente {
   };
   $transaction<T>(
     operacion: (tx: ClienteResultadosPersistente) => Promise<T>,
+    opciones?: { maxWait?: number; timeout?: number },
   ): Promise<T>;
 }

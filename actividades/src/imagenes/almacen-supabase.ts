@@ -103,6 +103,14 @@ function cabeceras(
   };
 }
 
+export function supabaseConfigurado(config: ConfigService): boolean {
+  const url = config.get<string>('SUPABASE_URL')?.trim() ?? '';
+  const clave = config.get<string>('SUPABASE_SECRET_KEY')?.trim() ?? '';
+  const jwtServicio = config.get<string>('SUPABASE_SERVICE_ROLE_JWT')?.trim() ?? '';
+  const bucket = config.get<string>('SUPABASE_STORAGE_BUCKET')?.trim() ?? '';
+  return url.startsWith('https://') && Boolean(clave) && esJwtCompacto(jwtServicio) && Boolean(bucket);
+}
+
 function esJwtCompacto(valor: string): boolean {
   const segmentos = valor.split('.');
   return segmentos.length === 3 && segmentos.every((segmento) => segmento);

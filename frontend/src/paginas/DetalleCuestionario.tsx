@@ -4,6 +4,7 @@ import { EstadoCarga, EstadoError } from '../componentes/Interfaz.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
 import { mensajeDe } from '../dominio/errores.ts'
+import { prepararPestanaSala, publicarSala } from '../juego/abrirSala.ts'
 import { acentoDeDificultad, etiquetaDificultad } from '../dominio/filtros.ts'
 import type { Cuestionario, ModoJuego, OpcionRespuesta, Pregunta } from '../dominio/tipos.ts'
 
@@ -32,6 +33,7 @@ export function DetalleCuestionario() {
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [abriendo, setAbriendo] = useState(false)
+  const [enlaceManual, setEnlaceManual] = useState<string | null>(null)
   const [practicando, setPracticando] = useState(false)
   const [modoSeleccionado, setModoSeleccionado] = useState<ModoJuego>('practica')
   const [selecciones, setSelecciones] = useState<Record<string, string>>({})
@@ -60,11 +62,15 @@ export function DetalleCuestionario() {
 
   async function iniciar() {
     if (!token) return
+    const ventana = prepararPestanaSala()
     setAbriendo(true)
+    setEnlaceManual(null)
     try {
       const creada = await sala.crear(token, id)
-      navegar(`/sala/${creada.codigo}`)
+      const publicada = publicarSala(ventana, creada.codigo)
+      if (!publicada.abierta) setEnlaceManual(publicada.url)
     } catch (err) {
+      if (ventana && !ventana.closed) ventana.close()
       setError(mensajeDe(err))
     } finally {
       setAbriendo(false)
@@ -127,6 +133,14 @@ export function DetalleCuestionario() {
         {cuestionario.esDemostracion ? <p className="etiqueta-demo">Datos de prueba</p> : null}
         <p>{cuestionario.descripcion || 'Este cuestionario no tiene descripción.'}</p>
         {error ? <p className="error-texto">{error}</p> : null}
+        {enlaceManual ? (
+          <p>
+            El navegador bloqueó la pestaña nueva.{' '}
+            <a href={enlaceManual} target="_blank" rel="noreferrer">
+              Abrir la sala
+            </a>
+          </p>
+        ) : null}
         {esDocente ? (
           <button className="conjunto-anfitrion" type="button" onClick={() => void iniciar()} disabled={abriendo}>
             {abriendo ? 'Abriendo…' : 'Juego anfitrión'}

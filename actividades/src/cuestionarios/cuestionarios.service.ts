@@ -242,7 +242,7 @@ export class CuestionariosService {
     const sesiones = await tx.sesionJuego.findMany({
       where: {
         cuestionarioId,
-        estado: { in: ['pregunta', 'cerrada'] },
+        estado: { in: ['pregunta', 'cerrada', 'clasificacion'] },
       },
       select: { preguntasInstantanea: true },
     });
@@ -480,7 +480,10 @@ export class CuestionariosService {
 
   private async transaccion<T>(operacion: (tx: Tx) => Promise<T>): Promise<T> {
     try {
-      return await this.db().$transaction(operacion);
+      return await this.db().$transaction(operacion, {
+        maxWait: 15_000,
+        timeout: 90_000,
+      });
     } catch (error) {
       if (
         error instanceof BadRequestException ||

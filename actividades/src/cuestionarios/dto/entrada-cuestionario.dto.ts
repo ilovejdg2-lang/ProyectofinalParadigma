@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -65,9 +66,11 @@ export class PreguntaDto {
   @Min(1)
   orden!: number;
 
-  @ApiPropertyOptional({ minimum: 1 })
+  @ApiPropertyOptional({ minimum: 5, maximum: 120 })
   @IsOptional()
   @IsInt()
+  @Min(5)
+  @Max(120)
   segundos?: number;
 }
 

@@ -48,8 +48,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
     const adapter = new PrismaPg({
       connectionString: conexion,
-      max: 5,
-      connectionTimeoutMillis: 5000,
+      max: 20,
+      connectionTimeoutMillis: 10_000,
     });
     const cliente = new PrismaClient({ adapter });
 

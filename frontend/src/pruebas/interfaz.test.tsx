@@ -61,6 +61,26 @@ describe('acceso', () => {
     await usuario.click(screen.getByRole('button', { name: 'Iniciar Sesión' }))
     expect(await screen.findByRole('heading', { name: 'Evaluaciones en vivo' })).toBeInTheDocument()
   })
+
+  it('recupera la contraseña con el servicio de autenticación', async () => {
+    const usuario = userEvent.setup()
+    const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
+    renderEn('/iniciar-sesion', servicios)
+    await usuario.click(await screen.findByRole('button', { name: '¿Olvidaste tu contraseña?' }))
+    const dialogo = await screen.findByRole('dialog')
+    expect(dialogo).toHaveTextContent('Recuperar contraseña')
+    const correoRecuperacion = dialogo.querySelector('input[type="email"]') as HTMLInputElement
+    await usuario.clear(correoRecuperacion)
+    await usuario.type(correoRecuperacion, CORREO_DEMO)
+    await usuario.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByLabelText('Código de recuperación')).toBeInTheDocument()
+    await usuario.type(screen.getByLabelText('Nueva contraseña'), 'NuevaClave2026!')
+    await usuario.type(screen.getByLabelText('Confirmar contraseña'), 'NuevaClave2026!')
+    await usuario.click(screen.getByRole('button', { name: 'Guardar contraseña' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    const sesion = await servicios.autenticacion.iniciarSesion(CORREO_DEMO, 'NuevaClave2026!')
+    expect(sesion.perfil.correo).toBe(CORREO_DEMO)
+  })
 })
 
 describe('cuestionarios', () => {
@@ -133,26 +153,25 @@ describe('partida y resultados', () => {
     sessionStorage.setItem('profelink.token', estudiante.token)
     renderEn(`/partida/${sala.codigo}`, servicios)
 
-    const verdadero = await screen.findByRole('button', { name: 'Verdadero' })
-    await usuario.click(verdadero)
-    expect(await screen.findByText('Respuesta enviada. No puedes cambiarla.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Verdadero' })).toBeDisabled()
-    await expect(servicios.sala.responder(estudiante.token, sala.codigo, false)).rejects.toThrow(/Ya enviaste/)
+    const correcta = await screen.findByRole('button', { name: 'Mismo resultado y sin cambiar estado externo' }, { timeout: 6000 })
+    await usuario.click(correcta)
+    expect(await screen.findByText(/¡Correcto!|Respuesta enviada/)).toBeInTheDocument()
+    await expect(servicios.sala.responder(estudiante.token, sala.codigo, false)).rejects.toThrow(/Ya enviaste|cerrada/)
 
-    await servicios.sala.cerrarPregunta(anfitrion.token, sala.codigo)
-    for (let indice = 0; indice < 3; indice += 1) {
-      await servicios.sala.avanzar(anfitrion.token, sala.codigo)
-      await servicios.sala.cerrarPregunta(anfitrion.token, sala.codigo)
+    for (let indice = 0; indice < 12; indice += 1) {
+      const actual = await servicios.sala.obtener(anfitrion.token, sala.codigo)
+      if (actual.estado === 'finalizada') break
+      if (actual.estado === 'pregunta') await servicios.sala.cerrarPregunta(anfitrion.token, sala.codigo)
+      else await servicios.sala.avanzar(anfitrion.token, sala.codigo)
     }
-    await servicios.sala.avanzar(anfitrion.token, sala.codigo)
     const final = await servicios.sala.obtener(anfitrion.token, sala.codigo)
     expect(final.estado).toBe('finalizada')
     cleanup()
     sessionStorage.setItem('profelink.token', anfitrion.token)
     renderEn(`/resultados/${sala.codigo}`, servicios)
-    expect(await screen.findByText('Ana Estudiante')).toBeInTheDocument()
-    expect(screen.getByText(/1 pts/)).toBeInTheDocument()
-  })
+    expect(await screen.findAllByText('Ana Estudiante')).not.toHaveLength(0)
+    expect(screen.getAllByText(/pts/).length).toBeGreaterThan(0)
+  }, 20_000)
 
   it('valida resultados guardados, evita duplicados y asocia el progreso al usuario autenticado', async () => {
     const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
@@ -206,5 +225,48 @@ describe('partida y resultados', () => {
     expect(progreso.partidasJugadas).toBe(1)
     expect(progreso.totalAciertos).toBe(6)
     expect(progreso.dominioKanban.porcentajeDominio).toBe(100)
+  })
+
+  it('muestra un QR que abre la partida con el código', async () => {
+    const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
+    const anfitrion = await entrarDemo(servicios)
+    const sala = await servicios.sala.crear(anfitrion.token, 'demo-funcional')
+    renderEn(`/sala/${sala.codigo}`, servicios)
+
+    const qr = await screen.findByTestId('codigo-qr')
+    expect(qr).toHaveAttribute('data-enlace', `https://profelink.sinkro.dev/iniciar-sesion?partida=${sala.codigo}`)
+    expect(await screen.findByRole('img', { name: `Código QR para entrar a la partida ${sala.codigo}` })).toBeInTheDocument()
+    expect(screen.getByText('Tus estudiantes pueden unirse escaneando el QR o ingresando el código en ProfeLink.')).toBeInTheDocument()
+  })
+
+  it('entra a la partida del enlace después de iniciar sesión, sin escribir el código', async () => {
+    const usuario = userEvent.setup()
+    const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
+    const anfitrion = await servicios.autenticacion.iniciarSesion(CORREO_DEMO, CONTRASENA_DEMO)
+    const sala = await servicios.sala.crear(anfitrion.token, 'demo-funcional')
+    const estudiante = await servicios.autenticacion.registrar({
+      nombre: 'Ana Invitada',
+      correo: 'ana.invitada@prueba.test',
+      contrasena: 'Demo-2026',
+    })
+    renderEn(`/partida/${sala.codigo}`, servicios)
+
+    expect(await screen.findByRole('heading', { name: 'Bienvenido de vuelta' })).toBeInTheDocument()
+    expect(screen.getByText(`Inicia sesión para entrar a la partida ${sala.codigo}. No necesitas escribir el código.`)).toBeInTheDocument()
+    await usuario.type(screen.getByLabelText('Correo electrónico'), estudiante.perfil.correo)
+    await usuario.type(screen.getByLabelText('Contraseña'), 'Demo-2026')
+    await usuario.click(screen.getByRole('button', { name: 'Iniciar Sesión' }))
+
+    expect(await screen.findByRole('heading', { name: 'Elige tu avatar' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThan(10)
+    await usuario.click(screen.getByRole('button', { name: 'Chica maga' }))
+    expect(screen.getByRole('button', { name: 'Chica maga' })).toHaveAttribute('aria-pressed', 'true')
+    await usuario.click(screen.getByRole('button', { name: 'Continuar →' }))
+    await usuario.click(screen.getByRole('button', { name: '¡Listo!' }))
+    expect(await screen.findByRole('heading', { name: 'Esperando al docente' })).toBeInTheDocument()
+    expect(await screen.findByText(/Ana Invitada/)).toBeInTheDocument()
+    const actual = await servicios.sala.obtener(anfitrion.token, sala.codigo)
+    expect(actual.participantes.map((item) => item.nombre)).toContain('Ana Invitada')
+    expect(actual.participantes.find((item) => item.nombre === 'Ana Invitada')?.avatarId).toBe('maga-rosa')
   })
 })

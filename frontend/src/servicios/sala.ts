@@ -18,6 +18,7 @@ import {
 } from '../dominio/validacion.ts'
 import type { ClienteActividades } from './actividades.ts'
 import type { ClienteAutenticacion } from './autenticacion.ts'
+import { puntosDeRespuesta } from '../juego/puntuacion.ts'
 import type { Almacen } from './almacen.ts'
 
 export type EstadoConexion = 'conectado' | 'desconectado' | 'error'
@@ -25,13 +26,18 @@ export type EstadoConexion = 'conectado' | 'desconectado' | 'error'
 export interface ClienteSala {
   readonly canal: 'simulado' | 'remoto'
   crear(token: string, cuestionarioId: string): Promise<Sala>
-  unirse(token: string, codigo: string): Promise<Sala>
+  unirse(token: string, codigo: string, ficha?: { nombre?: string; avatarId?: string }): Promise<Sala>
   obtener(token: string, codigo: string): Promise<Sala>
-  suscribir(codigo: string, token: string, alCambiar: (sala: Sala) => void): () => void
+  suscribir(
+    codigo: string,
+    token: string,
+    alCambiar: (sala: Sala) => void,
+    alConexion?: (estado: EstadoConexion) => void,
+  ): () => void
   iniciar(token: string, codigo: string): Promise<Sala>
   responder(token: string, codigo: string, valor: boolean | string): Promise<Sala>
   cerrarPregunta(token: string, codigo: string): Promise<Sala>
-  avanzar(token: string, codigo: string): Promise<Sala>
+  avanzar(token: string, codigo: string, desde?: Sala['estado']): Promise<Sala>
   guardarPartida(token: string, entrada: EntradaGuardarPartida): Promise<ResumenResultado>
   historial(token: string): Promise<ResumenResultado[]>
   progreso(token: string): Promise<ProgresoUsuario>
@@ -115,6 +121,20 @@ function exigirSala(estado: EstadoSalas, codigo: string): Sala {
   return sala
 }
 
+function avatarDeFicha(valor: string | undefined): string | undefined {
+  const pedido = valor?.trim() ?? ''
+  return /^[a-z][a-z-]{1,30}[a-z]$/.test(pedido) ? pedido : undefined
+}
+
+function cuentaSimulada(sala: Sala) {
+  return Boolean(
+    sala.estado === 'pregunta' &&
+      sala.preguntaActual === 0 &&
+      sala.abreEn &&
+      Date.now() < new Date(sala.abreEn).getTime(),
+  )
+}
+
 function copiarPreguntas(preguntas: Pregunta[]): Pregunta[] {
   return preguntas.map((pregunta) => ({
     ...pregunta,
@@ -147,6 +167,67 @@ export function crearSalaSimulada(
     notificar(almacen, codigo, sala)
   }
 
+  const relojes = new Map<string, number>()
+
+  function cancelarReloj(codigo: string) {
+    const id = relojes.get(codigo)
+    if (id) clearTimeout(id)
+    relojes.delete(codigo)
+  }
+
+  function cerrarSala(sala: Sala) {
+    cancelarReloj(sala.codigo)
+    const pregunta = sala.preguntas[sala.preguntaActual]
+    if (!pregunta || sala.estado !== 'pregunta') return
+    const limite = (pregunta.segundos && pregunta.segundos >= 5 ? pregunta.segundos : sala.segundos) * 1000
+    const inicio = sala.iniciaEn ? new Date(sala.iniciaEn).getTime() : Date.now()
+    const ids = new Set(sala.elegibles?.length ? sala.elegibles : sala.participantes.map((item) => item.id))
+    for (const participante of sala.participantes) {
+      if (!ids.has(participante.id)) continue
+      const respuesta = participante.respuestas.find((item) => item.preguntaId === pregunta.id && item.aceptada)
+      if (!respuesta || respuesta.puntos > 0) continue
+      const enviada = respuesta.enviadaEn ? new Date(respuesta.enviadaEn).getTime() : inicio
+      const transcurrido = Math.max(0, enviada - inicio)
+      respuesta.milisegundos = transcurrido
+      respuesta.puntos = puntosDeRespuesta(acierto(pregunta, respuesta), transcurrido, limite)
+    }
+    for (const participante of sala.participantes) {
+      participante.puntaje = participante.respuestas.reduce((suma, item) => suma + item.puntos, 0)
+      participante.aciertos = participante.respuestas.filter((item) => item.puntos > 0).length
+    }
+    sala.estado = 'cerrada'
+    sala.cierraEn = null
+  }
+
+  function programarReloj(sala: Sala) {
+    cancelarReloj(sala.codigo)
+    if (typeof window === 'undefined' || sala.estado !== 'pregunta' || !sala.cierraEn) return
+    const espera = new Date(sala.cierraEn).getTime() - Date.now() + 1
+    const id = window.setTimeout(() => {
+      relojes.delete(sala.codigo)
+      const estado = leerSalas(almacen)
+      const vigente = estado.salas[sala.codigo]
+      if (!vigente || vigente.estado !== 'pregunta' || !vigente.cierraEn) return
+      if (Date.now() <= new Date(vigente.cierraEn).getTime()) return
+      cerrarSala(vigente)
+      publicar(vigente.codigo, vigente)
+    }, Math.max(0, espera))
+    relojes.set(sala.codigo, id)
+  }
+
+  function abrirPregunta(sala: Sala, indice: number, abreEn?: string) {
+    const pregunta = sala.preguntas[indice]
+    const segundos = pregunta?.segundos && pregunta.segundos >= 5 && pregunta.segundos <= 120 ? pregunta.segundos : SEGUNDOS
+    const inicio = abreEn ? new Date(abreEn).getTime() : Date.now()
+    sala.preguntaActual = indice
+    sala.estado = 'pregunta'
+    sala.segundos = segundos
+    sala.iniciaEn = new Date(inicio).toISOString()
+    sala.cierraEn = new Date(inicio + segundos * 1000).toISOString()
+    sala.elegibles = sala.participantes.map((item) => item.id)
+    if (abreEn) sala.abreEn = abreEn
+  }
+
   return {
     canal: 'simulado',
     estadoConexion: () => conexion,
@@ -176,6 +257,7 @@ export function crearSalaSimulada(
         preguntaActual: 0,
         segundos: SEGUNDOS,
         cierraEn: null,
+        abreEn: null,
         participantes: [],
         preguntas: copiarPreguntas(cuestionario.preguntas),
         canal: 'simulado',
@@ -185,7 +267,7 @@ export function crearSalaSimulada(
       publicar(codigo, sala)
       return sala
     },
-    async unirse(token, codigo) {
+    async unirse(token, codigo, ficha) {
       exigirConexion()
       const perfil = await exigirPerfil(autenticacion, token)
       const estado = leerSalas(almacen)
@@ -193,15 +275,19 @@ export function crearSalaSimulada(
       if (sala.estado === 'finalizada') {
         throw new ErrorServicio('estado', 'Esta partida ya finalizó.')
       }
+      const nombre = ficha?.nombre?.trim() || perfil.nombre
+      const avatarId = avatarDeFicha(ficha?.avatarId)
       const existente = sala.participantes.find((item) => item.perfilId === perfil.id)
       if (existente) {
         existente.conectado = true
-        existente.nombre = perfil.nombre
+        existente.nombre = nombre
+        if (avatarId && (sala.estado === 'esperando' || !existente.avatarId)) existente.avatarId = avatarId
       } else {
         const participante: Participante = {
           id: crypto.randomUUID(),
           perfilId: perfil.id,
-          nombre: perfil.nombre,
+          nombre,
+          avatarId,
           conectado: true,
           puntaje: 0,
           aciertos: 0,
@@ -256,11 +342,11 @@ export function crearSalaSimulada(
       if (sala.estado !== 'esperando') {
         throw new ErrorServicio('estado', 'La partida ya fue iniciada.')
       }
-      sala.estado = 'pregunta'
-      sala.preguntaActual = 0
-      sala.cierraEn = new Date(Date.now() + sala.segundos * 1000).toISOString()
+      const abre = new Date(Date.now() + 4_500).toISOString()
+      abrirPregunta(sala, 0, abre)
       guardarSalas(almacen, estado)
       publicar(sala.codigo, sala)
+      programarReloj(sala)
       return sala
     },
     async responder(token, codigo, valor) {
@@ -272,11 +358,17 @@ export function crearSalaSimulada(
       if (!pregunta || sala.estado !== 'pregunta') {
         throw new ErrorServicio('tarde', 'La pregunta ya está cerrada. La respuesta no se acepta.')
       }
+      if (cuentaSimulada(sala)) {
+        throw new ErrorServicio('estado', 'La cuenta regresiva todavía no termina.')
+      }
       if (sala.cierraEn && Date.now() > new Date(sala.cierraEn).getTime()) {
         throw new ErrorServicio('tarde', 'El tiempo de respuesta terminó.')
       }
       const participante = sala.participantes.find((item) => item.perfilId === perfil.id)
       if (!participante) throw new ErrorServicio('permiso', 'No estás unido a esta sala.')
+      if (sala.elegibles?.length && !sala.elegibles.includes(participante.id)) {
+        throw new ErrorServicio('estado', 'Esta pregunta empezó antes de que entraras.')
+      }
       if (participante.respuestas.some((respuesta) => respuesta.preguntaId === pregunta.id && respuesta.aceptada)) {
         throw new ErrorServicio('estado', 'Ya enviaste una respuesta para esta pregunta.')
       }
@@ -287,7 +379,15 @@ export function crearSalaSimulada(
         aceptada: true,
         tardia: false,
         puntos: 0,
+        enviadaEn: new Date().toISOString(),
       })
+      const esperados = sala.elegibles?.length ? sala.elegibles : sala.participantes.map((item) => item.id)
+      const completos = esperados.every((id) =>
+        sala.participantes
+          .find((item) => item.id === id)
+          ?.respuestas.some((respuesta) => respuesta.preguntaId === pregunta.id && respuesta.aceptada),
+      )
+      if (esperados.length > 0 && completos) cerrarSala(sala)
       guardarSalas(almacen, estado)
       publicar(sala.codigo, sala)
       return sala
@@ -303,36 +403,15 @@ export function crearSalaSimulada(
       if (sala.estado !== 'pregunta') {
         throw new ErrorServicio('estado', 'No hay una pregunta abierta.')
       }
-      const pregunta = sala.preguntas[sala.preguntaActual]
-      if (!pregunta) throw new ErrorServicio('estado', 'No hay una pregunta activa.')
-      for (const participante of sala.participantes) {
-        const respuesta = participante.respuestas.find((item) => item.preguntaId === pregunta.id && item.aceptada)
-        if (!respuesta) {
-          participante.respuestas.push({
-            preguntaId: pregunta.id,
-            valor: null,
-            aceptada: false,
-            tardia: false,
-            puntos: 0,
-          })
-          continue
-        }
-        if (respuesta.puntos > 0) continue
-        if (acierto(pregunta, respuesta)) {
-          respuesta.puntos = 1
-          participante.puntaje += 1
-          participante.aciertos += 1
-        } else {
-          respuesta.puntos = 0
-        }
+      if (cuentaSimulada(sala)) {
+        throw new ErrorServicio('estado', 'La cuenta regresiva todavía no termina.')
       }
-      sala.estado = 'cerrada'
-      sala.cierraEn = null
+      cerrarSala(sala)
       guardarSalas(almacen, estado)
       publicar(sala.codigo, sala)
       return sala
     },
-    async avanzar(token, codigo) {
+    async avanzar(token, codigo, desde) {
       exigirConexion()
       const perfil = await exigirPerfil(autenticacion, token)
       const estado = leerSalas(almacen)
@@ -340,7 +419,16 @@ export function crearSalaSimulada(
       if (sala.anfitrionId !== perfil.id) {
         throw new ErrorServicio('permiso', 'Solo el anfitrión puede avanzar la partida.')
       }
-      if (sala.estado !== 'cerrada') {
+      if (desde && sala.estado !== desde) {
+        throw new ErrorServicio('estado', 'La partida ya avanzó.')
+      }
+      if (sala.estado === 'cerrada') {
+        sala.estado = 'clasificacion'
+        guardarSalas(almacen, estado)
+        publicar(sala.codigo, sala)
+        return sala
+      }
+      if (sala.estado !== 'clasificacion') {
         throw new ErrorServicio('estado', 'Cierra la pregunta antes de avanzar.')
       }
       if (sala.preguntaActual + 1 >= sala.preguntas.length) {
@@ -358,9 +446,8 @@ export function crearSalaSimulada(
         resultados.unshift(resumen)
         guardarResultados(almacen, resultados)
       } else {
-        sala.preguntaActual += 1
-        sala.estado = 'pregunta'
-        sala.cierraEn = new Date(Date.now() + sala.segundos * 1000).toISOString()
+        abrirPregunta(sala, sala.preguntaActual + 1)
+        programarReloj(sala)
       }
       guardarSalas(almacen, estado)
       publicar(sala.codigo, sala)
@@ -465,13 +552,15 @@ async function mensaje(respuesta: Response): Promise<string> {
 export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
   const raiz = baseUrl.replace(/\/$/, '')
   let conexion: EstadoConexion = 'conectado'
+  let pausado = false
+  let reabrir: (() => void) | null = null
   const autorizacion = (token: string) => ({
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
   })
 
   async function enviar(token: string, ruta: string, metodo: string, cuerpo?: unknown): Promise<Sala> {
-    if (conexion !== 'conectado') {
+    if (pausado) {
       throw new ErrorServicio('conexion', 'No hay conexión con la sala.')
     }
     const respuesta = await fetch(`${raiz}${ruta}`, {
@@ -490,13 +579,20 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
     canal: 'remoto',
     estadoConexion: () => conexion,
     desconectar() {
+      pausado = true
       conexion = 'desconectado'
     },
     reconectar() {
+      pausado = false
       conexion = 'conectado'
+      reabrir?.()
     },
     crear: (token, cuestionarioId) => enviar(token, '/sesiones-juego', 'POST', { cuestionarioId }),
-    unirse: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/participantes`, 'POST', {}),
+    unirse: (token, codigo, ficha) =>
+      enviar(token, `/sesiones-juego/${codigo}/participantes`, 'POST', {
+        nombre: ficha?.nombre,
+        avatarId: ficha?.avatarId,
+      }),
     obtener: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}`, 'GET'),
     iniciar: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/iniciar`, 'POST', {}),
     responder: (token, codigo, valor) =>
@@ -505,7 +601,8 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
         opcionId: typeof valor === 'string' ? valor : undefined,
       }),
     cerrarPregunta: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/cerrar`, 'POST', {}),
-    avanzar: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/avanzar`, 'POST', {}),
+    avanzar: (token, codigo, desde) =>
+      enviar(token, `/sesiones-juego/${codigo}/avanzar`, 'POST', desde ? { desde } : {}),
     async guardarPartida(token, entrada) {
       const respuesta = await fetch(`${raiz}/resultados/partidas`, {
         method: 'POST',
@@ -536,26 +633,78 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
       if (!respuesta.ok) throw new ErrorServicio('conexion', await mensaje(respuesta))
       return normalizarYValidarResultado((await respuesta.json()) as ResumenResultado)
     },
-    suscribir(codigo, token, alCambiar) {
+    suscribir(codigo, token, alCambiar, alConexion) {
       if (typeof WebSocket === 'undefined' || !canalUrl) return () => undefined
-      const socket = new WebSocket(
-        `${canalUrl}?codigo=${encodeURIComponent(codigo)}`,
-        ['profelink', `profelink-bearer.${token}`],
-      )
-      socket.onopen = () => {
-        conexion = 'conectado'
+      let cerrado = false
+      let socket: WebSocket | null = null
+      let espera: number | undefined
+      let intento = 0
+
+      const avisar = (estado: EstadoConexion) => {
+        conexion = estado
+        alConexion?.(estado)
       }
-      socket.onerror = () => {
-        conexion = 'error'
+
+      const abrir = () => {
+        if (cerrado) return
+        if (espera !== undefined) {
+          window.clearTimeout(espera)
+          espera = undefined
+        }
+        if (socket) {
+          socket.onclose = null
+          socket.close()
+        }
+        const actual = new WebSocket(
+          `${canalUrl}?codigo=${encodeURIComponent(codigo)}`,
+          ['profelink', `profelink-bearer.${token}`],
+        )
+        socket = actual
+        actual.onopen = () => {
+          if (socket !== actual) return
+          intento = 0
+          avisar('conectado')
+          void enviar(token, `/sesiones-juego/${encodeURIComponent(codigo)}`, 'GET')
+            .then((sala) => {
+              if (socket === actual) alCambiar(sala)
+            })
+            .catch(() => undefined)
+        }
+        actual.onerror = () => {
+          if (socket === actual) avisar('error')
+        }
+        actual.onclose = () => {
+          if (cerrado || socket !== actual) return
+          avisar('desconectado')
+          const pausa = Math.min(4000, 300 * 2 ** intento)
+          intento += 1
+          espera = window.setTimeout(abrir, pausa)
+        }
+        actual.onmessage = (evento) => {
+          if (socket !== actual) return
+          const datos = JSON.parse(String(evento.data)) as { sala?: Sala }
+          if (datos.sala?.codigo === codigo) {
+            avisar('conectado')
+            alCambiar(datos.sala)
+          }
+        }
       }
-      socket.onclose = () => {
-        if (conexion === 'conectado') conexion = 'desconectado'
+
+      const forzar = () => {
+        intento = 0
+        abrir()
       }
-      socket.onmessage = (evento) => {
-        const datos = JSON.parse(String(evento.data)) as { sala?: Sala }
-        if (datos.sala?.codigo === codigo) alCambiar(datos.sala)
+      reabrir = forzar
+      abrir()
+      return () => {
+        cerrado = true
+        if (reabrir === forzar) reabrir = null
+        if (espera !== undefined) window.clearTimeout(espera)
+        if (socket) {
+          socket.onclose = null
+          socket.close()
+        }
       }
-      return () => socket.close()
     },
   }
 }

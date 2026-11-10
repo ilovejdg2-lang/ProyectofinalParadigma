@@ -10,6 +10,7 @@ export interface PreguntaPublica {
   orden: number;
   imagenUrl?: string;
   respuestaCorrecta?: boolean;
+  segundos: number | null;
   opciones: OpcionPublica[];
 }
 
@@ -102,6 +103,7 @@ function presentarPregunta(
     id: pregunta.id,
     enunciado: pregunta.enunciado,
     orden: pregunta.orden,
+    segundos: pregunta.segundos,
     ...(imagenUrl ? { imagenUrl } : {}),
     ...(completo ? { respuestaCorrecta: pregunta.respuestaCorrecta } : {}),
     opciones,

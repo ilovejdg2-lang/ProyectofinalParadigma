@@ -73,6 +73,6 @@ Validación de API de actividades: `/openapi.json` devuelve el documento OpenAPI
 
 1. No se hizo una carga prolongada ni contra el despliegue. Sí se verificó localmente el runner con 20 solicitudes GET concurrentes (máximo 4), pero ese smoke test no es una prueba de capacidad ni de carga sostenida; la demo en vivo tuvo un solo estudiante.
 2. No se verificó el ciclo cargar-imagen → reiniciar servicio → recuperar el objeto desde una nueva sesión. La arquitectura usa Supabase Storage, pero la prueba end-to-end real requiere una escritura temporal y reinicio controlado; no se hizo para no tocar datos ni interrumpir producción sin consentimiento específico.
-3. `cliente-adicional/index.html` todavía manda su JWT WebSocket en un parámetro de consulta. El cliente React y el contrato actualizado usan `Sec-WebSocket-Protocol`; el demo HTML no debe usarse para probar WebSocket hasta alinearlo.
+3. `cliente-adicional/index.html` quedó alineado con `Sec-WebSocket-Protocol` el 2026-11-09. La revisión estática está en `cliente-adicional/protocolo-canal.test.mjs`. Falta probar el socket contra una sala real; esa prueba manual sigue pendiente.
 
 Estos pendientes están separados de los checks que sí se observaron. No se publicó una imagen a un registry ni se redeployó como parte de este cierre.
