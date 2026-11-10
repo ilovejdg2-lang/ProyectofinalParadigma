@@ -11,6 +11,7 @@ export default defineConfig({
   outputDir: 'resultados-playwright',
   use: {
     baseURL: process.env.PROFELINK_URL ?? 'http://127.0.0.1:5175',
+    actionTimeout: 20_000,
     trace: 'off',
     screenshot: 'only-on-failure',
     video: 'off',
