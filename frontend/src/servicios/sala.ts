@@ -180,7 +180,6 @@ export function crearSalaSimulada(
     cancelarReloj(sala.codigo)
     const pregunta = sala.preguntas[sala.preguntaActual]
     if (!pregunta || sala.estado !== 'pregunta') return
-    const limite = (pregunta.segundos && pregunta.segundos >= 5 ? pregunta.segundos : sala.segundos) * 1000
     const inicio = sala.iniciaEn ? new Date(sala.iniciaEn).getTime() : Date.now()
     const ids = new Set(sala.elegibles?.length ? sala.elegibles : sala.participantes.map((item) => item.id))
     for (const participante of sala.participantes) {

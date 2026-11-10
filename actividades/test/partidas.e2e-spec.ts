@@ -9,7 +9,9 @@ import {
   ResumenPublico,
   SalaPublica,
 } from '../src/sesiones-juego/presentacion-sala';
-import { cuestionarioValido, SesionMemoria } from './sesion-memoria';
+import { cuestionarioValido, esperarApertura, SesionMemoria } from './sesion-memoria';
+
+jest.setTimeout(15_000);
 
 function comoSala(cuerpo: unknown): SalaPublica {
   return cuerpo as SalaPublica;
@@ -74,11 +76,18 @@ describe('Partidas y resultados (e2e)', () => {
       .set('Authorization', 'Bearer token-luis')
       .send({})
       .expect(201);
-    await http
+    const iniciada = await http
       .post(`/sesiones-juego/${codigo}/iniciar`)
       .set('Authorization', 'Bearer token-ana')
       .send({})
       .expect(201);
+    await http
+      .post(`/sesiones-juego/${codigo}/respuestas`)
+      .set('Authorization', 'Bearer token-luis')
+      .send({ opcionId: 'p1a' })
+      .expect(409)
+      .expect({ mensaje: 'La cuenta regresiva todavía no termina.' });
+    await esperarApertura(comoSala(iniciada.body));
 
     await http
       .post(`/sesiones-juego/${codigo}/respuestas`)
@@ -93,9 +102,7 @@ describe('Partidas y resultados (e2e)', () => {
       .expect(201);
     const trasRespuesta = comoSala(respondida.body);
     expect(trasRespuesta.estado).toBe('cerrada');
-    expect(trasRespuesta.participantes[0].respuestas[0].puntos).toBeGreaterThanOrEqual(
-      500,
-    );
+    expect(trasRespuesta.participantes[0].respuestas[0].puntos).toBe(1);
     expect(JSON.stringify(respondida.body)).toContain('correcta');
 
     await http
@@ -103,7 +110,7 @@ describe('Partidas y resultados (e2e)', () => {
       .set('Authorization', 'Bearer token-luis')
       .send({ opcionId: 'p1b' })
       .expect(409)
-      .expect({ mensaje: 'Ya enviaste una respuesta para esta pregunta.' });
+      .expect({ mensaje: 'La pregunta ya está cerrada. La respuesta no se acepta.' });
 
     await http
       .post(`/sesiones-juego/${codigo}/cerrar`)
