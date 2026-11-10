@@ -46,11 +46,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const adapter = new PrismaPg({
-        connectionString: conexion,
-        max: 5,
-        connectionTimeoutMillis: 5000,
-      });
+      const adapter = new PrismaPg(
+        {
+          connectionString: conexion,
+          max: 5,
+          connectionTimeoutMillis: 5000,
+        },
+        {
+          schema: 'auth_service',
+        }
+      );
       const cliente = new PrismaClient({ adapter });
 
       await cliente.$queryRaw`SELECT 1`;

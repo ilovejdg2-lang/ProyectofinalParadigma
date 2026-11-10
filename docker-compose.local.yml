@@ -1,0 +1,163 @@
+# Instalación local desechable. No usa Supabase, no monta certificados
+# y no sustituye a docker-compose.yml ni a docker-compose.prod.yml.
+# La contraseña vive en .local/entorno.env, que no se versiona.
+# Creala con scripts/iniciar.ps1 o scripts/iniciar.sh.
+
+name: profelink-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: profelink
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?Definí LOCAL_DB_PASSWORD en .local/entorno.env}
+      POSTGRES_DB: profelink
+    ports:
+      - "127.0.0.1:54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U profelink -d profelink"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - profelink-local-db:/var/lib/postgresql/data
+
+  preparar-auth:
+    profiles: ["preparar"]
+    build:
+      context: ./autenticacion
+      dockerfile: Dockerfile.local-db
+    environment:
+      DIRECT_URL: postgresql://profelink:${LOCAL_DB_PASSWORD}@postgres:5432/profelink
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  preparar-actividades:
+    profiles: ["preparar"]
+    build:
+      context: ./actividades
+      dockerfile: Dockerfile.local-db
+    environment:
+      DIRECT_URL: postgresql://profelink:${LOCAL_DB_PASSWORD}@postgres:5432/profelink
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  auth-service:
+    build:
+      context: ./autenticacion
+      dockerfile: Dockerfile
+    environment:
+      PORT: "5001"
+      FRONTEND_URL: http://localhost:5173
+      DIRECT_URL: postgresql://profelink:${LOCAL_DB_PASSWORD}@postgres:5432/profelink
+      DATABASE_URL: postgresql://profelink:${LOCAL_DB_PASSWORD}@postgres:5432/profelink
+      JWT_ISSUER: http://localhost:5001
+      JWT_AUDIENCE: profelink-actividades
+      JWT_ACCESS_MINUTES: "15"
+      JWT_REFRESH_DAYS: "7"
+      REGISTRATION_MODE: open
+      EMAIL_AUTO_VERIFY: "true"
+      RSA_KEYS_DIR: /app/datos/keys
+      OTEL_SERVICE_NAME: auth-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+    volumes:
+      - profelink-local-auth-keys:/app/datos/keys
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-lgtm:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5001/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  actividades:
+    build:
+      context: ./actividades
+      dockerfile: Dockerfile
+    environment:
+      PORT: "5002"
+      FRONTEND_URL: http://localhost:5173
+      DIRECT_URL: postgresql://profelink:${LOCAL_DB_PASSWORD}@postgres:5432/profelink
+      DATABASE_URL: postgresql://profelink:${LOCAL_DB_PASSWORD}@postgres:5432/profelink
+      AUTH_URL: http://auth-service:5001
+      AUTH_JWKS_URL: http://auth-service:5001/.well-known/jwks.json
+      JWT_ISSUER: http://localhost:5001
+      JWT_AUDIENCE: profelink-actividades
+      OTEL_SERVICE_NAME: actividades
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      ALMACEN_IMAGENES_DIR: /app/almacen-imagenes
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://127.0.0.1:5002}
+    volumes:
+      - profelink-local-imagenes:/app/almacen-imagenes
+    ports:
+      - "5002:5002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      otel-lgtm:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5002/salud').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_AUTH_URL: http://localhost:5001
+        VITE_ACTIVIDADES_URL: http://localhost:5002
+        VITE_CANAL_URL: ws://localhost:5002/canal
+        VITE_USAR_SIMULACION: "false"
+    ports:
+      - "${LOCAL_FRONTEND_PORT:-5173}:8080"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      actividades:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.39.0
+    ports:
+      - "127.0.0.1:${LOCAL_GRAFANA_PORT:-3020}:3000"
+      - "127.0.0.1:${LOCAL_OTEL_PORT:-4320}:4318"
+    volumes:
+      - profelink-local-otel:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+volumes:
+  profelink-local-db:
+  profelink-local-auth-keys:
+  profelink-local-imagenes:
+  profelink-local-otel:

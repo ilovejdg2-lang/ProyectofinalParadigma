@@ -14,6 +14,21 @@ export function plazoVencido(
   return ahora.getTime() > new Date(cierraEn).getTime();
 }
 
+/** Un acierto vale los puntos del cuestionario. Por defecto es 1. El error vale 0. */
+export function puntosPorAciertoDe(valor: unknown): number {
+  const numero = typeof valor === 'number' ? valor : Number(valor);
+  if (!Number.isInteger(numero) || numero < 1) return 1;
+  return Math.min(100, numero);
+}
+
+export function puntosDeRespuesta(
+  acierto: boolean,
+  puntosPorAcierto: unknown = 1,
+): number {
+  if (!acierto) return 0;
+  return puntosPorAciertoDe(puntosPorAcierto);
+}
+
 export function esAcierto(
   pregunta: PreguntaInstantanea,
   seleccion: Seleccion,

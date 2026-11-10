@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 
 const categorias = ['Interfaz', 'Cuestionarios', 'Partida', 'Cuenta', 'Otro']
@@ -47,6 +47,15 @@ export function ReporteProblema({ abierto, onCerrar }: { abierto: boolean; onCer
     setError(null)
     setEnviado(true)
   }
+
+  useEffect(() => {
+    if (!abierto) return
+    function alTeclado(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') cerrar()
+    }
+    window.addEventListener('keydown', alTeclado)
+    return () => window.removeEventListener('keydown', alTeclado)
+  }, [abierto, onCerrar])
 
   if (!abierto) return null
 

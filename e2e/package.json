@@ -1,0 +1,14 @@
+{
+  "name": "profelink-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test partida.spec.ts",
+    "concurrencia": "node concurrencia.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "ws": "^8.18.3"
+  }
+}

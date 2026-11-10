@@ -72,3 +72,47 @@ export function extraerPasswordNueva(datos: any): string {
   }
   return val;
 }
+
+export class SolicitarRecuperacionDto {
+  @IsOptional()
+  @IsString()
+  correo?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+}
+
+export function extraerEmailRecuperacion(datos: any): string {
+  const val = (datos?.correo ?? datos?.email ?? '').trim().toLowerCase();
+  if (!val || !val.includes('@')) {
+    throw new Error('Escribe un correo válido.');
+  }
+  return val;
+}
+
+export class RestablecerPasswordDto {
+  @IsOptional()
+  @IsString()
+  codigo?: string;
+
+  @IsOptional()
+  @IsString()
+  token?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8, { message: 'La nueva contraseña debe tener al menos 8 caracteres' })
+  nuevaContrasena?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8, { message: 'La nueva contraseña debe tener al menos 8 caracteres' })
+  newPassword?: string;
+}
+
+export function extraerCodigoRecuperacion(datos: any): string {
+  const val = (datos?.codigo ?? datos?.token ?? '').trim();
+  if (!val) throw new Error('El código de recuperación es obligatorio.');
+  return val;
+}

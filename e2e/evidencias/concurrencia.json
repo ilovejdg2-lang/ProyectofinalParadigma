@@ -1,0 +1,77 @@
+[
+  {
+    "participantes": 10,
+    "codigo": "U2WUQD",
+    "unionMs": 4470,
+    "respuestasPrimera": 10,
+    "respuestasRechazadas": 0,
+    "puntajeUno": 2,
+    "puntajeDos": 8,
+    "identidadesUnicas": 10,
+    "podio": [
+      {
+        "nombre": "Alumno 10",
+        "puntaje": 2
+      },
+      {
+        "nombre": "Alumno 2",
+        "puntaje": 2
+      },
+      {
+        "nombre": "Alumno 3",
+        "puntaje": 2
+      }
+    ],
+    "coherente": true
+  },
+  {
+    "participantes": 20,
+    "codigo": "GCCAFB",
+    "unionMs": 10301,
+    "respuestasPrimera": 20,
+    "respuestasRechazadas": 0,
+    "puntajeUno": 4,
+    "puntajeDos": 16,
+    "identidadesUnicas": 20,
+    "podio": [
+      {
+        "nombre": "Alumno 10",
+        "puntaje": 2
+      },
+      {
+        "nombre": "Alumno 12",
+        "puntaje": 2
+      },
+      {
+        "nombre": "Alumno 13",
+        "puntaje": 2
+      }
+    ],
+    "coherente": true
+  },
+  {
+    "participantes": 30,
+    "codigo": "W7CKET",
+    "unionMs": 13786,
+    "respuestasPrimera": 30,
+    "respuestasRechazadas": 0,
+    "puntajeUno": 6,
+    "puntajeDos": 24,
+    "identidadesUnicas": 30,
+    "podio": [
+      {
+        "nombre": "Alumno 10",
+        "puntaje": 2
+      },
+      {
+        "nombre": "Alumno 12",
+        "puntaje": 2
+      },
+      {
+        "nombre": "Alumno 13",
+        "puntaje": 2
+      }
+    ],
+    "coherente": true
+  }
+]

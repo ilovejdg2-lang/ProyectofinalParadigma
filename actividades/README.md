@@ -74,7 +74,8 @@ No hace falta crear otro proyecto Supabase ni levantar PostgreSQL en local para 
 | `PORT` | Puerto HTTP. Por defecto `5002`, el mismo que `VITE_ACTIVIDADES_URL`. |
 | `FRONTEND_URL` | Origen CORS. Por defecto `http://localhost:5173`. Métodos `GET`, `POST`, `PUT`, `DELETE` y `OPTIONS`. |
 | `SUPABASE_URL` | Proyecto de Storage. |
-| `SUPABASE_SECRET_KEY` | Clave secreta solo de este backend. No va al frontend. |
+| `SUPABASE_SECRET_KEY` | Clave secreta moderna, exclusiva del backend. Se envía en `apikey`, no como Bearer JWT; nunca va al frontend. |
+| `SUPABASE_SERVICE_ROLE_JWT` | JWT válido del rol de servicio para `Authorization: Bearer`. Debe ser distinto de la clave `sb_secret_`; es una credencial de máximo privilegio y solo vive en el backend. |
 | `SUPABASE_STORAGE_BUCKET` | Bucket público. El previsto es `profelink-imagenes`. |
 
 La plantilla con valores de ejemplo está en `.env.example`. No copies contraseñas a este README ni al repositorio.
@@ -103,6 +104,24 @@ npm run start:dev
 | `npm run db:seed` | Carga los cuestionarios de demostración |
 
 `GET /salud` responde `{ "estado": "ok", "baseDatos": "disponible" | "no-configurada" | "no-disponible" }` y no incluye la cadena de conexión.
+
+### Trazas locales con OpenTelemetry y Grafana
+
+La configuración base de Docker Compose no inicia observabilidad. Para iniciar Actividades con trazas y Grafana local, desde la raíz del repositorio ejecuta:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d --build --no-deps actividades otel-lgtm
+```
+
+Este comando asume que `auth-service` ya está iniciado; `--no-deps` evita que Compose reinicie servicios ajenos a esta prueba local.
+
+Abre [http://localhost:3000](http://localhost:3000) (usuario y contraseña iniciales: `admin` / `admin`). En **Explore**, selecciona **Tempo** y busca el servicio `actividades`. La imagen `grafana/otel-lgtm` es una pila para desarrollo, demostraciones y pruebas; no está pensada para producción. El puerto de Grafana queda enlazado a `127.0.0.1`, y Actividades envía OTLP HTTP por la red interna de Compose. Los datos de Grafana/Tempo se conservan en el volumen `otel-lgtm-data`. Esta configuración no cambia Supabase.
+
+Para detener la pila local:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.observability.yml stop actividades otel-lgtm
+```
 
 ## Endpoints
 
@@ -204,7 +223,7 @@ Errores propios de esta familia:
 | 400 | `Selecciona una imagen.`, `El archivo de imagen está vacío.` o `Usa una imagen JPG, PNG, WEBP, GIF o SVG.` |
 | 400 | SVG rechazado por la revisión de contenido o por un fallo de conversión. |
 | 413 | `La imagen supera 5 MB.` |
-| 503 | `El almacenamiento de imágenes no está disponible.` Faltan `SUPABASE_URL`, `SUPABASE_SECRET_KEY` o `SUPABASE_STORAGE_BUCKET`. |
+| 503 | `El almacenamiento de imágenes no está disponible.` Falta `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_JWT` válido o `SUPABASE_STORAGE_BUCKET`. |
 
 Las pruebas sustituyen el almacenamiento y no escriben objetos en el bucket.
 
@@ -519,7 +538,7 @@ El cliente HTTP traduce 403, 404 y 409 a tipos propios, pero el texto visible si
 
 ## Integración con motor de juego — Persona 4
 
-La puntuación oficial es la de esta API: **1 punto por acierto y 0 por error o por no responder.** Se decide al cerrar, con la instantánea, y queda en `Respuesta.puntos`, `Participante.puntaje` y `Participante.aciertos`. El resultado final repite esos números y agrega `incorrectas`.
+La puntuación oficial es la de esta API: **los puntos del cuestionario por acierto y 0 por error o por no responder.** El valor por defecto es 1 y el docente puede cambiarlo, de 1 a 100, antes de iniciar. Se congela al arrancar la partida, se decide al cerrar y queda en `Respuesta.puntos`, `Participante.puntaje` y `Participante.aciertos`. Si empatan en puntos, el podio ordena por el tiempo acumulado de los aciertos (`Participante.tiempoMs`, menor primero). El resultado final repite esos números y agrega `incorrectas`.
 
 Para pintar la clasificación, `GET /resultados/:codigo` ya entrega los participantes ordenados por puntaje, aciertos y nombre. El historial es `GET /resultados`. No hace falta volver a sumar en el cliente; si se reordena, el mismo criterio está en `ordenarClasificacion`.
 
@@ -527,7 +546,7 @@ Las animaciones, la gamificación visual, la experiencia, las insignias y cualqu
 
 ## Integración e infraestructura — Persona 5
 
-Dependencias externas de este módulo: PostgreSQL de Supabase por `DIRECT_URL`, y Supabase Storage por `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_STORAGE_BUCKET`. El resto de las variables está en [Configuración](#configuración). `@nestjs/config` está fijado en `^4.0.4` porque una versión ESM posterior rompe el arranque.
+Dependencias externas de este módulo: PostgreSQL de Supabase por `DIRECT_URL`, y Supabase Storage por `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_JWT` y `SUPABASE_STORAGE_BUCKET`. La clave moderna `sb_secret_` es opaca, no es un JWT, y se envía solo en `apikey`; `Authorization: Bearer` usa por separado un JWT válido del rol de servicio. No reutilices la clave moderna en ambos encabezados. El resto de las variables está en [Configuración](#configuración). `@nestjs/config` está fijado en `^4.0.4` porque una versión ESM posterior rompe el arranque.
 
 Arranque local, con `.env` ya completo:
 
@@ -543,7 +562,7 @@ npm run start:dev
 
 No uses `prisma migrate dev` ni `prisma migrate reset` contra Supabase. `migrate dev` intenta `CREATE DATABASE` para una base sombra y el pooler no lo permite. Si Prisma ofrece resetear la base, hay que rechazarlo. Tampoco uses `db push`.
 
-Docker, el despliegue, CI/CD, el monitoreo y las pruebas globales de carga no forman parte de este módulo.
+La infraestructura transversal de Persona 5 (Docker/Compose local, monitoreo y pruebas independientes de carga) se documenta en el README raíz y en las secciones correspondientes de este archivo. Este módulo mantiene la documentación de su API y sus pruebas. El despliegue externo no se cubre aquí.
 
 ## Pruebas
 
@@ -557,9 +576,42 @@ Docker, el despliegue, CI/CD, el monitoreo y las pruebas globales de carga no fo
 
 La última pasada de esta etapa dejó en verde las unitarias, las e2e, ESLint y `nest build`. El catálogo público comprobó en Supabase, en solo lectura, que `demo-funcional` existe y que el JSON no trae `correcta` ni `respuestaCorrecta`. Las escrituras de cuestionarios, imágenes, salas, respuestas y resultados de esas pruebas no tocaron la base compartida: el almacenamiento de imágenes también está sustituido.
 
-No se ejecutó una partida completa de extremo a extremo contra servicios reales. Tampoco se ejecutó `SELECT … FOR UPDATE` sobre PostgreSQL real. Las carreras cubiertas por el doble en memoria son dos respuestas simultáneas del mismo participante, una respuesta coincidiendo con el cierre, dos avances simultáneos, un fallo al guardar resultados y el reintento sin duplicar puntos. El doble cierre simultáneo queda cubierto ahí por la actualización condicionada al estado. Eso no sustituye una prueba con conexiones y transacciones reales.
+No se ejecutó una partida completa de extremo a extremo contra servicios reales. Sí se probó el inicio simultáneo de una misma partida contra PostgreSQL real: una llamada tuvo éxito y la otra obtuvo conflicto, con el estado persistido en `pregunta`. Las demás carreras cubiertas por el doble en memoria son dos respuestas simultáneas del mismo participante, una respuesta coincidiendo con el cierre, dos avances simultáneos, un fallo al guardar resultados y el reintento sin duplicar puntos. El doble cierre simultáneo queda cubierto ahí por la actualización condicionada al estado. Esas pruebas en memoria no sustituyen pruebas con conexiones y transacciones reales.
 
-Para hacerla falta una base distinta de la compartida de ProfeLink, un rol dueño con permiso de crear el esquema y de `SELECT … FOR UPDATE`, aplicar solo la migración existente con `npm run db:deploy`, y una variable aparte que no reemplace `DIRECT_URL`. Crear esa base o cambiar `.env` requiere autorización. No se ha creado.
+La prueba real usa una base local distinta de la compartida de ProfeLink, con un rol dueño y una variable temporal de test que no reemplaza `DIRECT_URL` ni modifica `.env`. Para añadir otros escenarios reales se debe mantener esa separación y usar el mismo procedimiento documentado abajo; nunca correr `migrate dev`, `migrate reset` ni `db push` contra Supabase.
+
+### Prueba de concurrencia real de inicio
+
+La prueba `test/sesiones-juego.postgres-spec.ts` abre una sala con el cuestionario local `demo-funcional`, incorpora un participante y compite dos llamadas a `iniciar` contra PostgreSQL real. Debe confirmarse exactamente un inicio y un conflicto; después comprueba el estado persistido. No usa la base compartida de Supabase.
+
+Esta prueba exige una base cuyo nombre empiece con `actividades_concurrency_test_` y cuya URL apunte a `localhost`, `127.0.0.1` o `::1`. La guarda es deliberada: sin `ACTIVIDADES_TEST_DATABASE_URL` o si la base no cumple ambas condiciones, la prueba falla antes de conectarse.
+
+En PowerShell, crea una base nueva en tu PostgreSQL local y configura la URL de esa base aislada:
+
+```powershell
+$testDb = 'actividades_concurrency_test_local'
+docker exec auth-migration-lab createdb -U postgres $testDb
+$env:ACTIVIDADES_TEST_DATABASE_URL = 'postgresql://<usuario>:<contraseña-local>@127.0.0.1:<puerto>/' + $testDb
+```
+
+Aplica la migración y el seed solo a esa base, guardando y restaurando el valor previo de `DIRECT_URL` en esa terminal:
+
+```powershell
+$oldDirectUrl = $env:DIRECT_URL
+try {
+  $env:DIRECT_URL = $env:ACTIVIDADES_TEST_DATABASE_URL
+  npm run db:deploy
+  if ($LASTEXITCODE -ne 0) { throw 'Falló la migración de la base local.' }
+  npm run db:seed
+  if ($LASTEXITCODE -ne 0) { throw 'Falló el seed de la base local.' }
+} finally {
+  if ($null -eq $oldDirectUrl) { Remove-Item Env:DIRECT_URL -ErrorAction SilentlyContinue }
+  else { $env:DIRECT_URL = $oldDirectUrl }
+}
+npm run test:postgres:concurrency
+```
+
+El test lee `ACTIVIDADES_TEST_DATABASE_URL` directamente; no modifica `.env`. No borres ni reutilices una base que contenga datos ajenos a esta prueba.
 
 ## Estado de la etapa 2
 
@@ -573,13 +625,12 @@ Para hacerla falta una base distinta de la compartida de ProfeLink, un rol dueñ
 | 4 | Salas, incorporación, reconexión, inicio e instantánea. |
 | 5 | Respuestas, cierre, un punto por acierto, avance, finalización, historial y clasificación. La revisión posterior protege los ids de una instantánea activa y oculta la selección ajena mientras la pregunta está abierta. |
 
-Sigue fuera de este módulo, a cargo de otros integrantes:
+Los siguientes pendientes funcionales están fuera de este módulo y corresponden a otros integrantes:
 
 | Persona | Pendiente |
 |---|---|
 | 1. Frontend | Dejar la simulación, enviar Bearer también en el detalle del propietario, alinear el tope de 15 MB con los 5 MB de la API y tratar como opcional el `opcionId` ajeno durante la pregunta abierta. |
 | 3. Autenticación y canal | Implementar `VerificadorIdentidad` con JWT. Sustituir la lista en memoria de `AvisoSesiones` por una entrega fiable y el WebSocket de `VITE_CANAL_URL`. |
 | 4. Motor de juego | Animaciones, gamificación visual, XP, insignias y cualquier puntuación distinta de 1 o 0. |
-| 5. Infraestructura | Docker, despliegue, CI/CD, monitoreo, pruebas de carga y, si se autoriza, la base aislada para concurrencia real. |
 
 Hasta que el verificador exista, las operaciones protegidas responden 401. Hasta que exista el canal, el cliente solo ve cambios al volver a consultar la sala.

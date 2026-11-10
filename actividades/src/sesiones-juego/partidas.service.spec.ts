@@ -45,6 +45,11 @@ async function salaLista() {
   await contexto.servicio.unirse(sala.codigo, luis);
   await contexto.servicio.unirse(sala.codigo, marta);
   const iniciada = await contexto.servicio.iniciar(sala.codigo, ana);
+  const snap = contexto.memoria.sesiones[0]?.preguntasInstantanea;
+  const ya = new Date(Date.now() - 1_000);
+  if (snap) snap.abreEn = ya.toISOString();
+  contexto.memoria.sesiones[0].iniciaEn = ya;
+  contexto.memoria.sesiones[0].cierraEn = new Date(ya.getTime() + contexto.memoria.sesiones[0].segundos * 1000);
   return { ...contexto, codigo: sala.codigo, iniciada };
 }
 
@@ -58,6 +63,25 @@ describe('plazo de respuesta', () => {
 });
 
 describe('respuestas, cierre y resultados', () => {
+  it('espera la cuenta regresiva antes de aceptar respuestas o cerrar', async () => {
+    const { servicio } = armar();
+    const sala = await servicio.crear('quiz-1', ana);
+    await servicio.unirse(sala.codigo, luis);
+    const iniciada = await servicio.iniciar(sala.codigo, ana);
+    expect(new Date(iniciada.abreEn ?? 0).getTime()).toBeGreaterThan(Date.now());
+    const temprana = await rechazo(
+      servicio.responder(sala.codigo, luis, { opcionId: 'p1a' }),
+    );
+    expect(temprana).toBeInstanceOf(ConflictException);
+    expect(temprana.getResponse().mensaje).toBe(
+      'La cuenta regresiva todavía no termina.',
+    );
+    const cierre = await rechazo(servicio.cerrar(sala.codigo, ana));
+    expect(cierre.getResponse().mensaje).toBe(
+      'La cuenta regresiva todavía no termina.',
+    );
+  });
+
   it('registra una opción y un verdadero o falso sin revelar la solución', async () => {
     const { servicio, codigo, iniciada } = await salaLista();
     expect(JSON.stringify(iniciada)).not.toContain('correcta');
@@ -119,6 +143,7 @@ describe('respuestas, cierre y resultados', () => {
     await servicio.responder(codigo, luis, { opcionId: 'p1a' });
     await servicio.cerrar(codigo, ana);
     await servicio.avanzar(codigo, ana);
+    await servicio.avanzar(codigo, ana);
     const anterior = await rechazo(
       servicio.responder(codigo, luis, { opcionId: 'p1a' }),
     );
@@ -158,7 +183,9 @@ describe('respuestas, cierre y resultados', () => {
     );
 
     await servicio.avanzar(codigo, ana);
+    await servicio.avanzar(codigo, ana);
     await servicio.cerrar(codigo, ana);
+    await servicio.avanzar(codigo, ana);
     await servicio.avanzar(codigo, ana);
     const fin = await rechazo(
       servicio.responder(codigo, marta, { valor: true }),
@@ -169,9 +196,8 @@ describe('respuestas, cierre y resultados', () => {
   it('califica una sola vez y deja en cero a quien falló o no respondió', async () => {
     const { servicio, memoria, codigo } = await salaLista();
     await servicio.responder(codigo, luis, { opcionId: 'p1a' });
-    await servicio.responder(codigo, marta, { opcionId: 'p1b' });
     memoria.cuestionarios[0].preguntas[0].opciones[0].correcta = false;
-    const cerrada = await servicio.cerrar(codigo, ana);
+    const cerrada = await servicio.responder(codigo, marta, { opcionId: 'p1b' });
     expect(cerrada.estado).toBe('cerrada');
     expect(cerrada.cierraEn).toBeNull();
     const luisSala = cerrada.participantes.find(
@@ -180,8 +206,9 @@ describe('respuestas, cierre y resultados', () => {
     const martaSala = cerrada.participantes.find(
       (item) => item.perfilId === 'marta',
     );
-    expect(luisSala).toMatchObject({ puntaje: 1, aciertos: 1 });
-    expect(luisSala?.respuestas[0].puntos).toBe(1);
+    expect(luisSala?.aciertos).toBe(1);
+    expect(luisSala?.puntaje).toBe(1);
+    expect(luisSala?.respuestas[0].puntos).toBe(luisSala?.puntaje);
     expect(luisSala?.respuestas[0].opcionId).toBe('p1a');
     expect(martaSala).toMatchObject({ puntaje: 0, aciertos: 0 });
     expect(martaSala?.respuestas[0].puntos).toBe(0);
@@ -232,9 +259,11 @@ describe('respuestas, cierre y resultados', () => {
 
     await servicio.responder(codigo, marta, { valor: true });
     expect(memoria.respuestas).toHaveLength(2);
-    await servicio.cerrar(codigo, ana);
+    expect(memoria.sesiones[0].estado).toBe('cerrada');
     expect(
-      memoria.sesiones[0].participantes.every((item) => item.puntaje === 1),
+      memoria.sesiones[0].participantes.every(
+        (item) => item.puntaje === 1,
+      ),
     ).toBe(true);
   });
 
@@ -286,6 +315,9 @@ describe('respuestas, cierre y resultados', () => {
     const { servicio, codigo } = await salaLista();
     await servicio.responder(codigo, luis, { opcionId: 'p1a' });
     await servicio.cerrar(codigo, ana);
+    const ranking = await servicio.avanzar(codigo, ana);
+    expect(ranking.estado).toBe('clasificacion');
+    expect(ranking.preguntaActual).toBe(0);
     const antes = Date.now();
     const avanzada = await servicio.avanzar(codigo, ana);
     expect(avanzada.estado).toBe('pregunta');
@@ -351,15 +383,26 @@ describe('respuestas, cierre y resultados', () => {
     seguir();
     await cierre;
     const avanzada = await paso;
-    expect(avanzada.preguntaActual).toBe(1);
+    expect(avanzada.estado).toBe('clasificacion');
+    expect(avanzada.preguntaActual).toBe(0);
     expect(
       avanzada.participantes.find((item) => item.perfilId === 'luis')?.puntaje,
     ).toBe(1);
 
+    const siguiente = await servicio.avanzar(codigo, ana);
+    expect(siguiente.preguntaActual).toBe(1);
     await servicio.cerrar(codigo, ana);
+    const haciaRanking = await Promise.allSettled([
+      servicio.avanzar(codigo, ana, 'cerrada'),
+      servicio.avanzar(codigo, ana, 'cerrada'),
+    ]);
+    expect(
+      haciaRanking.filter((item) => item.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(memoria.sesiones[0].estado).toBe('clasificacion');
     const saltos = await Promise.allSettled([
-      servicio.avanzar(codigo, ana),
-      servicio.avanzar(codigo, ana),
+      servicio.avanzar(codigo, ana, 'clasificacion'),
+      servicio.avanzar(codigo, ana, 'clasificacion'),
     ]);
     expect(saltos.filter((item) => item.status === 'fulfilled')).toHaveLength(
       1,
@@ -373,11 +416,13 @@ describe('respuestas, cierre y resultados', () => {
     await servicio.responder(codigo, luis, { opcionId: 'p1a' });
     await servicio.cerrar(codigo, ana);
     await servicio.avanzar(codigo, ana);
+    await servicio.avanzar(codigo, ana);
     await servicio.responder(codigo, luis, { opcionId: 'p2b' });
     await servicio.cerrar(codigo, ana);
+    await servicio.avanzar(codigo, ana);
     memoria.fallarResultados = true;
     await rechazo(servicio.avanzar(codigo, ana));
-    expect(memoria.sesiones[0].estado).toBe('cerrada');
+    expect(memoria.sesiones[0].estado).toBe('clasificacion');
     expect(memoria.sesiones[0].finalizadaEn).toBeNull();
     expect(memoria.resultados).toHaveLength(0);
 
@@ -395,10 +440,10 @@ describe('respuestas, cierre y resultados', () => {
         )?.id,
     );
     expect(deLuis).toMatchObject({
-      puntuacion: 2,
       aciertos: 2,
       incorrectas: 0,
     });
+    expect(deLuis?.puntuacion).toBe(2);
     const deMarta = memoria.resultados.find((item) => item !== deLuis);
     expect(deMarta).toMatchObject({
       puntuacion: 0,

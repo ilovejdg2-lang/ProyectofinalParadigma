@@ -1,11 +1,18 @@
 import {
+  BadGatewayException,
   BadRequestException,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
 import { PrismaMemoria } from '../../test/prisma-memoria';
 import { AlmacenImagenes, ArchivoAlmacen } from './almacen-imagenes';
-import { subirObjeto } from './almacen-supabase';
+import {
+  AlmacenSupabase,
+  retirarObjeto,
+  subirObjeto,
+} from './almacen-supabase';
 import { ImagenesService } from './imagenes.service';
 import { LIMITE_IMAGEN_BYTES } from './validar-archivo';
 import { PrismaService } from '../prisma/prisma.service';
@@ -206,19 +213,108 @@ describe('ImagenesService', () => {
 describe('Almacen de Supabase', () => {
   const origen = {
     url: 'https://proyecto.supabase.co',
-    clave: 'clave-prueba',
+    clave: 'sb_secret-prueba',
+    jwtServicio: 'eyJhbGci.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature',
     bucket: 'profelink-imagenes',
   };
 
-  it('sube el archivo y devuelve la URL pública', async () => {
-    const solicitudes: { url: string; tipo?: string }[] = [];
+  it('usa la clave secreta como apikey y el JWT de servicio como Bearer', async () => {
+    const valores: Record<string, string> = {
+      SUPABASE_URL: origen.url,
+      SUPABASE_SECRET_KEY: origen.clave,
+      SUPABASE_SERVICE_ROLE_JWT: origen.jwtServicio,
+      SUPABASE_STORAGE_BUCKET: origen.bucket,
+    };
+    const config = {
+      get: (nombre: string) => valores[nombre],
+    } as unknown as ConfigService;
+    const solicitar = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+
+    try {
+      await new AlmacenSupabase(config).subir({
+        ruta: 'ana/foto.png',
+        tipoMime: 'image/png',
+        contenido: png,
+      });
+
+      const headers = new Headers(solicitar.mock.calls[0]?.[1]?.headers);
+      expect(headers.get('apikey')).toBe('sb_secret-prueba');
+      expect(headers.get('authorization')).toBe(`Bearer ${origen.jwtServicio}`);
+    } finally {
+      solicitar.mockRestore();
+    }
+  });
+
+  it('no intenta Storage si falta el JWT separado de servicio', async () => {
+    const config = {
+      get: (nombre: string) =>
+        ({
+          SUPABASE_URL: origen.url,
+          SUPABASE_SECRET_KEY: origen.clave,
+          SUPABASE_STORAGE_BUCKET: origen.bucket,
+        })[nombre],
+    } as unknown as ConfigService;
+    const solicitar = jest.spyOn(global, 'fetch');
+
+    try {
+      expect(() =>
+        new AlmacenSupabase(config).subir({
+          ruta: 'ana/foto.png',
+          tipoMime: 'image/png',
+          contenido: png,
+        }),
+      ).toThrow(ServiceUnavailableException);
+      expect(solicitar).not.toHaveBeenCalled();
+    } finally {
+      solicitar.mockRestore();
+    }
+  });
+
+  it('no usa una clave moderna como sustituto del JWT de servicio', async () => {
+    const config = {
+      get: (nombre: string) =>
+        ({
+          SUPABASE_URL: origen.url,
+          SUPABASE_SECRET_KEY: origen.clave,
+          SUPABASE_SERVICE_ROLE_JWT: 'sb_secret-no-es-un-jwt',
+          SUPABASE_STORAGE_BUCKET: origen.bucket,
+        })[nombre],
+    } as unknown as ConfigService;
+    const solicitar = jest.spyOn(global, 'fetch');
+
+    try {
+      expect(() =>
+        new AlmacenSupabase(config).subir({
+          ruta: 'ana/foto.png',
+          tipoMime: 'image/png',
+          contenido: png,
+        }),
+      ).toThrow(ServiceUnavailableException);
+      expect(solicitar).not.toHaveBeenCalled();
+    } finally {
+      solicitar.mockRestore();
+    }
+  });
+
+  it('envía credenciales separadas en apikey y Authorization para Storage', async () => {
+    const solicitudes: {
+      url: string;
+      tipo?: string;
+      metodo?: string;
+      authorization?: string;
+      apiKey?: string;
+    }[] = [];
     const solicitar = ((url: string | URL, init?: RequestInit) => {
       const cabeceras = new Headers(init?.headers);
       solicitudes.push({
         url: String(url),
         tipo: cabeceras.get('content-type') ?? undefined,
+        metodo: init?.method,
+        authorization: cabeceras.get('authorization') ?? undefined,
+        apiKey: cabeceras.get('apikey') ?? undefined,
       });
-      expect(cabeceras.get('authorization')).toBe('Bearer clave-prueba');
       return Promise.resolve(new Response('{}', { status: 200 }));
     }) as typeof fetch;
 
@@ -234,30 +330,66 @@ describe('Almacen de Supabase', () => {
       'https://proyecto.supabase.co/storage/v1/object/profelink-imagenes/ana/foto.png',
     );
     expect(solicitudes[0]?.tipo).toBe('image/png');
+    expect(solicitudes[0]?.authorization).toBe(`Bearer ${origen.jwtServicio}`);
+    expect(solicitudes[0]?.apiKey).toBe('sb_secret-prueba');
+
+    await retirarObjeto(origen, solicitar, 'ana/foto.png');
+    expect(solicitudes[1]).toMatchObject({
+      metodo: 'DELETE',
+      apiKey: 'sb_secret-prueba',
+      authorization: `Bearer ${origen.jwtServicio}`,
+    });
   });
 
-  it('no reenvía el detalle interno cuando Storage rechaza el archivo', async () => {
+  it.each([400, 415])(
+    'distingue el rechazo HTTP %i de Storage de un formato de archivo inválido',
+    async (estado) => {
+      const solicitar = (() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ message: 'detalle interno del bucket' }),
+            {
+              status: estado,
+            },
+          ),
+        )) as typeof fetch;
+      const rechazo = subirObjeto(origen, solicitar, {
+        ruta: 'ana/foto.png',
+        tipoMime: 'image/png',
+        contenido: png,
+      });
+      await expect(rechazo).rejects.toBeInstanceOf(BadGatewayException);
+      const error = await rechazo.catch((valor: unknown) => valor);
+      expect(error).toBeInstanceOf(BadGatewayException);
+      if (error instanceof BadGatewayException) {
+        expect(error.getStatus()).toBe(502);
+        expect(error.getResponse()).toEqual({
+          mensaje: `El almacenamiento rechazó la carga de la imagen (HTTP ${estado}).`,
+        });
+      }
+    },
+  );
+
+  it('does not log the Storage response after removing temporary diagnostics', async () => {
+    const log = jest.spyOn(Logger, 'warn').mockImplementation(() => undefined);
     const solicitar = (() =>
       Promise.resolve(
-        new Response(
-          JSON.stringify({ message: 'detalle interno del bucket' }),
-          {
-            status: 415,
-          },
-        ),
+        new Response(JSON.stringify({ message: 'private storage detail' }), {
+          status: 400,
+        }),
       )) as typeof fetch;
-    const rechazo = subirObjeto(origen, solicitar, {
-      ruta: 'ana/foto.png',
-      tipoMime: 'image/png',
-      contenido: png,
-    });
-    await expect(rechazo).rejects.toBeInstanceOf(BadRequestException);
-    const error = await rechazo.catch((valor: unknown) => valor);
-    expect(error).toBeInstanceOf(BadRequestException);
-    if (error instanceof BadRequestException) {
-      expect(error.getResponse()).toEqual({
-        mensaje: 'Usa una imagen JPG, PNG, WEBP, GIF o SVG.',
-      });
+
+    try {
+      await expect(
+        subirObjeto(origen, solicitar, {
+          ruta: 'private/user/photo.png',
+          tipoMime: 'image/png',
+          contenido: png,
+        }),
+      ).rejects.toBeInstanceOf(BadGatewayException);
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
     }
   });
 });

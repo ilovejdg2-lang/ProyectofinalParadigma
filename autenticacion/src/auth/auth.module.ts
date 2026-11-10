@@ -16,7 +16,7 @@ import { AuthService } from './auth.service';
     AlmacenUsuariosHibrido,
     {
       provide: AlmacenUsuarios,
-      useClass: AlmacenUsuariosHibrido,
+      useExisting: AlmacenUsuariosHibrido,
     },
   ],
   exports: [AuthService, KeysService, AlmacenUsuarios],

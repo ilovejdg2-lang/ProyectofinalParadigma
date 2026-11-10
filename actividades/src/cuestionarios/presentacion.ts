@@ -1,3 +1,5 @@
+import { puntosPorAciertoDe } from '../sesiones-juego/calificacion';
+
 export interface OpcionPublica {
   id: string;
   texto: string;
@@ -10,6 +12,7 @@ export interface PreguntaPublica {
   orden: number;
   imagenUrl?: string;
   respuestaCorrecta?: boolean;
+  segundos: number | null;
   opciones: OpcionPublica[];
 }
 
@@ -25,6 +28,7 @@ export interface CuestionarioPublico {
   preguntas: PreguntaPublica[];
   imagenUrl?: string;
   esDemostracion: boolean;
+  puntosPorAcierto: number;
   actualizadoEn: string;
 }
 
@@ -57,6 +61,7 @@ export interface FilaCuestionario {
   autorId: string;
   autorNombre: string;
   esDemostracion: boolean;
+  puntosPorAcierto?: number;
   actualizadoEn: Date | string;
   eliminadoEn?: Date | string | null;
   imagen?: { url: string } | null;
@@ -78,6 +83,7 @@ export function presentar(
     autorId: fila.autorId,
     autorNombre: fila.autorNombre,
     esDemostracion: fila.esDemostracion,
+    puntosPorAcierto: puntosPorAciertoDe(fila.puntosPorAcierto),
     actualizadoEn: new Date(fila.actualizadoEn).toISOString(),
     ...(imagenUrl ? { imagenUrl } : {}),
     preguntas: [...fila.preguntas]
@@ -102,6 +108,7 @@ function presentarPregunta(
     id: pregunta.id,
     enunciado: pregunta.enunciado,
     orden: pregunta.orden,
+    segundos: pregunta.segundos,
     ...(imagenUrl ? { imagenUrl } : {}),
     ...(completo ? { respuestaCorrecta: pregunta.respuestaCorrecta } : {}),
     opciones,

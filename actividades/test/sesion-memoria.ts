@@ -53,6 +53,7 @@ interface ParticipanteMemoria {
   sesionId: string;
   perfilId: string;
   nombre: string;
+  avatarId?: string | null;
   conectado: boolean;
   puntaje: number;
   aciertos: number;
@@ -66,10 +67,12 @@ interface SesionMemoriaFila {
   titulo: string;
   anfitrionId: string;
   anfitrionNombre: string;
-  estado: 'esperando' | 'pregunta' | 'cerrada' | 'finalizada';
+  estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada';
   preguntaActual: number;
   segundos: number;
+  iniciaEn: Date | null;
   cierraEn: Date | null;
+  elegibles: string[];
   preguntasInstantanea: InstantaneaPreguntas | null;
   iniciadaEn: Date | null;
   finalizadaEn: Date | null;
@@ -93,6 +96,60 @@ export class SesionMemoria {
   respuestas: RespuestaMemoria[] = [];
   resultados: ResultadoMemoria[] = [];
   fallosCodigoRestantes = 0;
+  cursos: { id: string; nombre: string; docenteId: string }[] = [];
+  matriculas: { cursoId: string; estudianteId: string }[] = [];
+  calificaciones: Array<{ sesionId: string }> = [];
+
+  readonly curso = {
+    findFirst: async ({ where }: { where: { id: string; docenteId: string } }) =>
+      this.cursos.find((item) => item.id === where.id && item.docenteId === where.docenteId) ?? null,
+    upsert: async ({
+      where,
+      create,
+    }: {
+      where: { id: string };
+      update: Record<string, never>;
+      create: { id: string; nombre: string; docenteId: string };
+    }) => {
+      const existente = this.cursos.find((item) => item.id === where.id);
+      if (existente) return existente;
+      this.cursos.push(create);
+      return create;
+    },
+  };
+
+  readonly matricula = {
+    findFirst: async ({ where }: { where: { cursoId: string; estudianteId: string } }) =>
+      this.matriculas.find((item) => item.cursoId === where.cursoId && item.estudianteId === where.estudianteId) ?? null,
+    findMany: async ({ where }: { where: { cursoId: string } }) =>
+      this.matriculas.filter((item) => item.cursoId === where.cursoId),
+    upsert: async ({
+      where,
+      create,
+    }: {
+      where: { cursoId_estudianteId: { cursoId: string; estudianteId: string } };
+      update: { nombre: string };
+      create: { id: string; cursoId: string; estudianteId: string; nombre: string };
+    }) => {
+      const clave = where.cursoId_estudianteId;
+      const existente = this.matriculas.find(
+        (item) => item.cursoId === clave.cursoId && item.estudianteId === clave.estudianteId,
+      );
+      if (existente) return existente;
+      const fila = { cursoId: create.cursoId, estudianteId: create.estudianteId };
+      this.matriculas.push(fila);
+      return fila;
+    },
+  };
+
+  readonly calificacion = {
+    count: async ({ where }: { where: { sesionId: string } }) =>
+      this.calificaciones.filter((item) => item.sesionId === where.sesionId).length,
+    createMany: async ({ data }: { data: Array<{ sesionId: string }> }) => {
+      this.calificaciones.push(...data);
+      return { count: data.length };
+    },
+  };
   fallarResultados = false;
   /** Cede el turno una vez, ya con el candado de la fila tomado. */
   ganchoTrasBloquear: (() => Promise<void>) | null = null;
@@ -121,6 +178,8 @@ export class SesionMemoria {
       data: Omit<
         SesionMemoriaFila,
         | 'cierraEn'
+        | 'iniciaEn'
+        | 'elegibles'
         | 'preguntasInstantanea'
         | 'iniciadaEn'
         | 'finalizadaEn'
@@ -137,6 +196,8 @@ export class SesionMemoria {
       const fila: SesionMemoriaFila = {
         ...data,
         cierraEn: null,
+        iniciaEn: null,
+        elegibles: [],
         preguntasInstantanea: null,
         iniciadaEn: null,
         finalizadaEn: null,
@@ -212,7 +273,9 @@ export class SesionMemoria {
         estado: fila.estado,
         preguntaActual: fila.preguntaActual,
         segundos: fila.segundos,
+        iniciaEn: fila.iniciaEn,
         cierraEn: fila.cierraEn,
+        elegibles: fila.elegibles,
         preguntasInstantanea: fila.preguntasInstantanea,
         iniciadaEn: fila.iniciadaEn,
         finalizadaEn: fila.finalizadaEn,
@@ -248,6 +311,7 @@ export class SesionMemoria {
         sesionId: string;
         perfilId: string;
         nombre: string;
+        avatarId?: string;
         conectado: boolean;
       };
     }) => {
@@ -281,7 +345,7 @@ export class SesionMemoria {
       data: Partial<
         Pick<
           ParticipanteMemoria,
-          'nombre' | 'conectado' | 'puntaje' | 'aciertos'
+          'nombre' | 'avatarId' | 'conectado' | 'puntaje' | 'aciertos'
         >
       >;
     }) => {
@@ -294,6 +358,7 @@ export class SesionMemoria {
       if (!fila) throw errorPrisma('P2025');
       const antes = {
         nombre: fila.nombre,
+        avatarId: fila.avatarId,
         conectado: fila.conectado,
         puntaje: fila.puntaje,
         aciertos: fila.aciertos,

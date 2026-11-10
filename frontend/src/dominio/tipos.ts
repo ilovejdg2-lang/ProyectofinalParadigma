@@ -16,6 +16,7 @@ export interface Perfil {
   nombre: string
   correo: string
   rol?: 'teacher' | 'student' | 'admin' | string
+  creadoEn?: string
 }
 
 export interface Sesion {
@@ -57,6 +58,7 @@ export interface Cuestionario {
   preguntas: Pregunta[]
   imagenUrl?: string
   esDemostracion: boolean
+  puntosPorAcierto?: number
   actualizadoEn: string
 }
 
@@ -69,10 +71,12 @@ export interface BorradorPregunta {
   id: string
   enunciado: string
   respuestaCorrecta: boolean | null
+  tipo: 'vf' | 'opciones'
   opciones: BorradorOpcion[]
   opcionCorrectaId: string | null
   imagenUrl?: string
   imagenSimulada: boolean
+  segundos?: number
 }
 
 export interface BorradorCuestionario {
@@ -83,10 +87,11 @@ export interface BorradorCuestionario {
   dificultad: Dificultad
   imagenUrl?: string
   imagenSimulada: boolean
+  puntosPorAcierto: number
   preguntas: BorradorPregunta[]
 }
 
-export type EstadoSala = 'esperando' | 'pregunta' | 'cerrada' | 'finalizada'
+export type EstadoSala = 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada'
 
 export interface RespuestaParticipante {
   preguntaId: string
@@ -95,15 +100,19 @@ export interface RespuestaParticipante {
   aceptada: boolean
   tardia: boolean
   puntos: number
+  milisegundos?: number
+  enviadaEn?: string
 }
 
 export interface Participante {
   id: string
   perfilId: string
   nombre: string
+  avatarId?: string
   conectado: boolean
   puntaje: number
   aciertos: number
+  tiempoMs?: number
   respuestas: RespuestaParticipante[]
 }
 
@@ -117,10 +126,31 @@ export interface Sala {
   estado: EstadoSala
   preguntaActual: number
   segundos: number
+  puntosPorAcierto?: number
+  iniciaEn?: string | null
   cierraEn: string | null
+  elegibles?: string[]
+  abreEn?: string | null
   participantes: Participante[]
   preguntas: Pregunta[]
   canal: 'simulado' | 'remoto'
+  evaluacion?: {
+    cursoId: string
+    cursoNombre: string
+    nombre: string
+    notaMaxima: number
+    valorPorcentaje: number
+    notaMinima: number
+  }
+}
+
+export interface ConfiguracionSala {
+  modo: 'practica' | 'evaluacion'
+  cursoId?: string
+  nombreEvaluacion?: string
+  notaMaxima?: number
+  valorPorcentaje?: number
+  notaMinima?: number
 }
 
 export interface ResultadoImagen {

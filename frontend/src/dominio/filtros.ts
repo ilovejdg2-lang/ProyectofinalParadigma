@@ -33,8 +33,12 @@ export function filtrarCuestionarios(lista: Cuestionario[], filtros: FiltrosCata
   })
 }
 
-export function ordenarClasificacion<T extends { puntaje: number; aciertos: number; nombre: string }>(participantes: T[]): T[] {
+export function ordenarClasificacion<T extends { puntaje: number; aciertos: number; nombre: string; tiempoMs?: number }>(participantes: T[]): T[] {
   return [...participantes].sort(
-    (a, b) => b.puntaje - a.puntaje || b.aciertos - a.aciertos || a.nombre.localeCompare(b.nombre, 'es'),
+    (a, b) =>
+      b.puntaje - a.puntaje ||
+      (a.tiempoMs ?? 0) - (b.tiempoMs ?? 0) ||
+      b.aciertos - a.aciertos ||
+      a.nombre.localeCompare(b.nombre, 'es'),
   )
 }

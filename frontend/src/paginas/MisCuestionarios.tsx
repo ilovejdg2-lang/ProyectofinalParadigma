@@ -24,7 +24,7 @@ function textoEditado(iso: string): string {
 }
 
 export function MisCuestionarios() {
-  const { actividades, sala } = useServicios()
+  const { actividades } = useServicios()
   const { token } = useAutenticacion()
   const navegar = useNavigate()
   const [lista, setLista] = useState<Cuestionario[]>([])
@@ -32,7 +32,6 @@ export function MisCuestionarios() {
   const [error, setError] = useState<string | null>(null)
   const [pendiente, setPendiente] = useState<Cuestionario | null>(null)
   const [menu, setMenu] = useState<string | null>(null)
-  const [abriendo, setAbriendo] = useState<string | null>(null)
 
   function cargar() {
     if (!token) return
@@ -50,18 +49,6 @@ export function MisCuestionarios() {
   useEffect(() => {
     cargar()
   }, [actividades, token])
-
-  async function anfitrion(id: string) {
-    if (!token) return
-    setAbriendo(id)
-    try {
-      const creada = await sala.crear(token, id)
-      navegar(`/sala/${creada.codigo}`)
-    } catch (err) {
-      setError(mensajeDe(err))
-      setAbriendo(null)
-    }
-  }
 
   async function eliminar() {
     if (!token || !pendiente) return
@@ -140,10 +127,9 @@ export function MisCuestionarios() {
               <button
                 type="button"
                 className="conjunto-anfitrion"
-                disabled={abriendo === cuestionario.id}
-                onClick={() => void anfitrion(cuestionario.id)}
+                onClick={() => navegar(`/cuestionarios/${cuestionario.id}/configurar`)}
               >
-                <IconoPlay /> {abriendo === cuestionario.id ? 'Abriendo…' : 'Anfitrión'}
+                <IconoPlay /> Configurar
               </button>
             </div>
           </article>

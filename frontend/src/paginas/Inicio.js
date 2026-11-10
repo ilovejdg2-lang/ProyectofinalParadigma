@@ -1,0 +1,11 @@
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { Link } from 'react-router-dom';
+import { Particulas } from '../componentes/Particulas.tsx';
+import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx';
+export function Inicio() {
+    const { perfil } = useAutenticacion();
+    const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin';
+    return (_jsxs(_Fragment, { children: [_jsxs("section", { className: "banner", children: [_jsx(Particulas, {}), _jsx("h1", { children: "Evaluaciones en vivo" }), _jsxs("p", { children: ["Hola, ", perfil?.nombre, ". ", esDocente
+                                ? 'Descubre un cuestionario, ábrelo en una sala y dirige la sesión interactiva con el grupo.'
+                                : 'Explora cuestionarios para estudiar o ingresa a una sala en vivo con el código de tu profesor.'] })] }), _jsxs("div", { className: "rejilla", children: [_jsxs("article", { className: "panel tarjeta-inicio acento-azul", children: [_jsx("h2", { children: "Descubrir" }), _jsx("p", { className: "meta", children: "Explora cuestionarios de la clase y prep\u00E1rate para las evaluaciones." }), _jsx(Link, { className: "boton", to: "/descubrir", children: "Ver cat\u00E1logo" })] }), esDocente ? (_jsxs("article", { className: "panel tarjeta-inicio acento-naranja", children: [_jsx("h2", { children: "Crear" }), _jsx("p", { className: "meta", children: "Arma preguntas de verdadero o falso y adjunta una imagen si la necesitas." }), _jsx(Link, { className: "boton", to: "/cuestionarios/nuevo", children: "Nuevo cuestionario" })] })) : (_jsxs("article", { className: "panel tarjeta-inicio acento-naranja", children: [_jsx("h2", { children: "Mi Historial" }), _jsx("p", { className: "meta", children: "Consulta tus resultados y puntuaciones de partidas anteriores." }), _jsx(Link, { className: "boton", to: "/historial", children: "Ver resultados" })] })), _jsxs("article", { className: "panel tarjeta-inicio acento-verde", children: [_jsx("h2", { children: "Unirse" }), _jsx("p", { className: "meta", children: "Entra con el c\u00F3digo que comparte el anfitri\u00F3n. Tu nombre ya viene del perfil." }), _jsx(Link, { className: "boton", to: "/unirse", children: "Ir a la sala" })] })] })] }));
+}

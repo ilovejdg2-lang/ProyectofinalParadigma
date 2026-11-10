@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { leerEspacio } from '../paginas/espacio.ts'
 import { Buho } from './Buho.tsx'
 import { ReporteProblema } from './ReporteProblema.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
+import { leerTema } from '../tema.ts'
 
 const curso = [
+  { to: '/cursos/paradigmas', etiqueta: 'Vista General', detalle: 'Contenido del curso', fin: true, icono: 'libro' },
+]
+
+const progresoCurso = [
+  { to: '/cursos/paradigmas/calificaciones', etiqueta: 'Mis Calificaciones', detalle: 'Ver calificaciones', icono: 'estrella' },
+  { to: '/cursos/paradigmas/voz', etiqueta: 'Tu voz en el curso', detalle: 'Comparte tu experiencia de forma anónima', icono: 'mensaje' },
+]
+
+const cuestionario = [
   { to: '/', etiqueta: 'Vista general', detalle: 'Evaluaciones en vivo', fin: true, icono: 'inicio' },
   { to: '/descubrir', etiqueta: 'Descubrir', detalle: 'Catálogo de cuestionarios', icono: 'buscar' },
   { to: '/mis-cuestionarios', etiqueta: 'Mis cuestionarios', detalle: 'Los que creaste', icono: 'lista' },
-  { to: '/cuestionarios/nuevo', etiqueta: 'Crear cuestionario', detalle: 'Verdadero o falso', icono: 'mas' },
+  { to: '/cuestionarios/nuevo', etiqueta: 'Crear cuestionario', detalle: 'Verdadero o falso y opciones', icono: 'mas' },
   { to: '/unirse', etiqueta: 'Unirse a una partida', detalle: 'Entrar con el código', icono: 'puerta' },
 ]
 
@@ -24,14 +35,27 @@ export function Marco() {
   const { simulacion } = useServicios()
   const [abierta, setAbierta] = useState(false)
   const [contraida, setContraida] = useState(false)
-  const [claro, setClaro] = useState(() => localStorage.getItem('profelink.tema') === 'claro')
+  const [claro, setClaro] = useState(() => leerTema() === 'claro')
   const [reporte, setReporte] = useState(false)
+  const ubicacion = useLocation()
+  const enJuego = /^\/(sala|partida|resultados)\//.test(ubicacion.pathname)
+  const portadaCursos = ubicacion.pathname === '/cursos'
+  const detalleCurso = ubicacion.pathname.startsWith('/cursos/paradigmas')
   const inicial = perfil?.nombre.slice(0, 1).toUpperCase() ?? 'M'
 
   useEffect(() => {
     document.documentElement.dataset.tema = claro ? 'claro' : 'oscuro'
     localStorage.setItem('profelink.tema', claro ? 'claro' : 'oscuro')
   }, [claro])
+
+  useEffect(() => {
+    if (!abierta) return
+    function alTeclado(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') setAbierta(false)
+    }
+    window.addEventListener('keydown', alTeclado)
+    return () => window.removeEventListener('keydown', alTeclado)
+  }, [abierta])
 
   function cambiarTema() {
     const aplicar = () => {
@@ -41,20 +65,38 @@ export function Marco() {
     else aplicar()
   }
 
+  const espacio = leerEspacio()
   const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
   const rolEtiqueta = perfil?.rol === 'admin' ? 'Administrador' : esDocente ? 'Docente' : 'Estudiante'
-  const enlacesCurso = curso.filter((enlace) => {
+  const enlaces = (espacio === 'cursos' ? curso : cuestionario).filter((enlace) => {
     if (!esDocente && (enlace.to === '/mis-cuestionarios' || enlace.to === '/cuestionarios/nuevo')) {
       return false
     }
     return true
   })
+  const enlacesProgreso = espacio === 'cursos' ? progresoCurso : progreso
+  const inicio = espacio === 'cursos' ? '/cursos' : '/'
+
+  if (!espacio) return <Navigate to="/elegir" replace />
 
   return (
-    <div className={`aplicacion${contraida ? ' contraida' : ''}${claro ? ' claro' : ''}`}>
+    <div className={`aplicacion${contraida ? ' contraida' : ''}${claro ? ' claro' : ''}${enJuego ? ' en-juego' : ''}${portadaCursos ? ' sin-barra' : ''}`}>
       <header className="cabecera">
-        <button className="cabecera-menu" type="button" aria-expanded={abierta} onClick={() => setAbierta((valor) => !valor)}>
-          Menú
+        <button
+          className="cabecera-menu"
+          type="button"
+          aria-expanded={abierta}
+          aria-controls="navegacion-principal"
+          aria-label={abierta ? 'Cerrar menú' : 'Abrir menú'}
+          onClick={() => setAbierta((valor) => !valor)}
+        >
+          <svg className="icono-nav" viewBox="0 0 24 24" aria-hidden="true">
+            {abierta ? (
+              <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            ) : (
+              <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            )}
+          </svg>
         </button>
         <div className="cabecera-marca">
           <span className="marca-icono">
@@ -63,22 +105,9 @@ export function Marco() {
           <strong>ProfeLink</strong>
         </div>
         <div className="cabecera-acciones">
-          <span
-            className="insignia-rol"
-            style={{
-              padding: '0.25rem 0.65rem',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              background: esDocente ? 'rgba(56, 189, 248, 0.15)' : 'rgba(52, 211, 153, 0.15)',
-              color: esDocente ? '#38bdf8' : '#34d399',
-              border: `1px solid ${esDocente ? 'rgba(56, 189, 248, 0.4)' : 'rgba(52, 211, 153, 0.4)'}`,
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-          >
-            {rolEtiqueta}
-          </span>
+          {espacio === 'cursos' ? null : (
+            <span className={esDocente ? 'insignia-rol docente' : 'insignia-rol estudiante'}>{rolEtiqueta}</span>
+          )}
           <button className="cabecera-icono" type="button" aria-label="Reportar un problema" onClick={() => setReporte(true)}>
             <Icono nombre="depurar" />
           </button>
@@ -90,14 +119,14 @@ export function Marco() {
           </NavLink>
         </div>
       </header>
-      <aside className={abierta ? 'barra abierta' : 'barra'}>
+      <aside id="navegacion-principal" className={abierta ? 'barra abierta' : 'barra'}>
         <div className="curso-cabeza">
-          <NavLink className="curso-casa" to="/" aria-label="Inicio" onClick={() => setAbierta(false)}>
+          <NavLink className="curso-casa" to={inicio} end={inicio !== '/'} aria-label="Casa" onClick={() => setAbierta(false)}>
             <Icono nombre="casa" />
           </NavLink>
           <div className="curso-textos">
-            <strong>Paradigmas de Programación</strong>
-            <small>{rolEtiqueta}</small>
+            <strong>{espacio === 'cursos' ? 'Paradigmas de Programación' : 'Casa'}</strong>
+            <small>{espacio === 'cursos' ? (detalleCurso ? 'Mi curso' : 'Tus cursos') : 'Cuestionarios'}</small>
           </div>
           <button
             className="curso-contraer"
@@ -109,8 +138,8 @@ export function Marco() {
           </button>
         </div>
         <nav className="grupo-nav" aria-label="Principal">
-          <p>CURSO</p>
-          {enlacesCurso.map((enlace) => (
+          <p>{detalleCurso || espacio === 'cursos' ? 'CURSO' : 'CUESTIONARIO'}</p>
+          {enlaces.map((enlace) => (
             <NavLink
               key={enlace.to}
               to={enlace.to}
@@ -125,7 +154,7 @@ export function Marco() {
           ))}
           <hr />
           <p>MI PROGRESO</p>
-          {progreso.map((enlace) => (
+          {enlacesProgreso.map((enlace) => (
             <NavLink
               key={enlace.to}
               to={enlace.to}
@@ -138,6 +167,9 @@ export function Marco() {
             </NavLink>
           ))}
         </nav>
+        <NavLink className="cambiar-espacio" to="/elegir" onClick={() => setAbierta(false)}>
+          Cambiar espacio
+        </NavLink>
         <button className="cerrar-sesion" type="button" onClick={() => void salir()}>
           Cerrar sesión
         </button>
@@ -163,8 +195,16 @@ function Icono({ nombre }: { nombre: string }) {
   const trazo = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
   return (
     <svg className="icono-nav" viewBox="0 0 24 24" aria-hidden="true">
-      {nombre === 'casa' ? <path {...trazo} d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" /> : null}
-      {nombre === 'inicio' ? <path {...trazo} d="M5 5h9a2 2 0 0 1 2 2v12H7a2 2 0 0 1-2-2zM8 9h5M8 13h5" /> : null}
+      {nombre === 'casa' ? (
+        <>
+          <path {...trazo} d="M3 11 12 4l9 7" />
+          <path {...trazo} d="M6 10.5V20h12v-9.5" />
+          <path {...trazo} d="M10 20v-5h4v5" />
+        </>
+      ) : null}
+      {nombre === 'inicio' || nombre === 'libro' ? <path {...trazo} d="M5 5h9a2 2 0 0 1 2 2v12H7a2 2 0 0 1-2-2zM8 9h5M8 13h5" /> : null}
+      {nombre === 'estrella' ? <path {...trazo} d="M12 4l2.2 4.6 5 .7-3.6 3.5.9 5.1L12 15.8 7.5 17.9l.9-5.1L4.8 9.3l5-.7z" /> : null}
+      {nombre === 'mensaje' ? <path {...trazo} d="M5 6h14v9H8l-3 3z" /> : null}
       {nombre === 'buscar' ? (
         <>
           <circle {...trazo} cx="11" cy="11" r="6" />

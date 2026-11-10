@@ -1,0 +1,1 @@
+ALTER TABLE "Participante" ADD COLUMN IF NOT EXISTS "avatarId" TEXT;

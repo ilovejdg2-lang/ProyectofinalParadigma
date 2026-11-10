@@ -1,17 +1,56 @@
+import { shutdownTelemetry } from './instrumentation.js';
+import type { Server } from 'node:http';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { SwaggerModule } from '@nestjs/swagger';
+import { apiReference } from '@scalar/nestjs-api-reference';
+import { createOpenApiConfig } from './openapi/openapi.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
+  const server = app.getHttpServer() as Server;
+  server.once('close', () => {
+    void shutdownTelemetry().catch((error: unknown) => {
+      Logger.error('Error shutting down OpenTelemetry', error, 'Bootstrap');
+    });
+  });
   const config = app.get(ConfigService);
-  const origen = config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+  const origenes = (config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173')
+    .split(',')
+    .map((origen) => origen.trim())
+    .filter(Boolean);
+  const origenLocal = /^https?:\/\/(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(:\d+)?$/;
 
   app.enableCors({
-    origin: origen,
+    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+      if (!origin || origenes.includes(origin) || origenLocal.test(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  const openApiConfig = createOpenApiConfig();
+  const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
+
+  SwaggerModule.setup('docs', app, openApiDocument, {
+    ui: false,
+    raw: ['json'],
+    jsonDocumentUrl: '/openapi.json',
+  });
+
+  app.use(
+    '/reference',
+    apiReference({
+      content: openApiDocument,
+    }),
+  );
 
   const puerto = Number(config.get<string>('PORT') ?? 5002);
   await app.listen(puerto);

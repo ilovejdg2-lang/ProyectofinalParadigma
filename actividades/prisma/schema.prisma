@@ -5,6 +5,8 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  importFileExtension = "js"
 }
 
 datasource db {
@@ -21,6 +23,7 @@ enum EstadoSesion {
   esperando
   pregunta
   cerrada
+  clasificacion
   finalizada
 }
 
@@ -47,6 +50,8 @@ model Cuestionario {
   etiquetas     String[]
   dificultad    Dificultad
   esDemostracion Boolean   @default(false)
+  /// Puntos que suma un acierto. El error y la falta de respuesta valen 0.
+  puntosPorAcierto Int     @default(1)
   imagenId      String?
   imagen        Imagen?    @relation(fields: [imagenId], references: [id], onDelete: SetNull)
   creadoEn      DateTime   @default(now()) @db.Timestamptz(3)
@@ -111,7 +116,11 @@ model SesionJuego {
   estado               EstadoSesion @default(esperando)
   preguntaActual       Int          @default(0)
   segundos             Int          @default(20)
+  /// Instante en que la pregunta actual admite respuestas.
+  iniciaEn             DateTime?    @db.Timestamptz(3)
   cierraEn             DateTime?    @db.Timestamptz(3)
+  /// Participantes congelados al abrir la pregunta. Quien entra después no cuenta.
+  elegibles            String[]     @default([])
   /// Copia de preguntas y opciones al iniciar. Conserva el enunciado y la
   /// respuesta que se jugaron aunque el cuestionario se edite después.
   preguntasInstantanea Json?
@@ -119,13 +128,69 @@ model SesionJuego {
   iniciadaEn           DateTime?    @db.Timestamptz(3)
   finalizadaEn         DateTime?    @db.Timestamptz(3)
 
+  /// practica conserva el juego. evaluacion además guarda notas del curso.
+  modoAcademico    String   @default("practica") @db.VarChar(20)
+  cursoId          String?
+  curso            Curso?   @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+  /// Nombre del curso al crear la sala. No cambia si el curso se renombra.
+  cursoNombre      String?  @db.VarChar(80)
+  nombreEvaluacion String?  @db.VarChar(80)
+  notaMaxima       Int      @default(100)
+  valorPorcentaje  Int      @default(0)
+  notaMinima       Int      @default(70)
+
   participantes Participante[]
   respuestas    Respuesta[]
   resultados    Resultado[]
+  calificaciones Calificacion[]
 
   @@index([anfitrionId])
   @@index([estado])
   @@index([cuestionarioId])
+  @@index([cursoId])
+}
+
+model Curso {
+  id        String   @id
+  nombre    String   @db.VarChar(80)
+  docenteId String
+  creadoEn  DateTime @default(now()) @db.Timestamptz(3)
+
+  matriculas Matricula[]
+  sesiones   SesionJuego[]
+
+  @@index([docenteId])
+}
+
+model Matricula {
+  id           String @id @default(uuid())
+  cursoId      String
+  curso        Curso  @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+  estudianteId String
+  nombre       String @db.VarChar(80)
+
+  @@unique([cursoId, estudianteId])
+  @@index([estudianteId])
+}
+
+/// Nota académica de una ejecución ya cerrada. No se recalcula.
+model Calificacion {
+  id           String      @id @default(uuid())
+  sesionId     String
+  sesion       SesionJuego @relation(fields: [sesionId], references: [id], onDelete: Restrict)
+  estudianteId String
+  nombre       String
+  aciertos     Int
+  total        Int
+  nota         Int
+  aporte       Float
+  posicion     Int
+  puntaje      Int
+  creadaEn     DateTime    @default(now()) @db.Timestamptz(3)
+
+  @@unique([sesionId, estudianteId])
+  @@index([estudianteId])
+  @@index([sesionId])
 }
 
 model Participante {
@@ -134,9 +199,12 @@ model Participante {
   sesion         SesionJuego @relation(fields: [sesionId], references: [id], onDelete: Restrict)
   perfilId       String
   nombre         String
+  avatarId       String?
   conectado      Boolean     @default(true)
   puntaje        Int         @default(0)
   aciertos       Int         @default(0)
+  /// Suma de milisegundos de los aciertos. El podio desempata con este valor.
+  tiempoMs       Int         @default(0)
   incorporadoEn  DateTime    @default(now()) @db.Timestamptz(3)
 
   respuestas Respuesta[]

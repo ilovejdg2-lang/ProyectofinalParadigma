@@ -18,7 +18,10 @@ export const TAMANO_MAXIMO_IMAGEN = 15_000_000
 export function validarImagen(archivo: File): string | null {
   const tipo = archivo.type === 'image/jpg' ? 'image/jpeg' : archivo.type
   const extensionOk = /\.(jpe?g|png|webp|gif|svg)$/i.test(archivo.name)
-  const tipoValido = TIPOS_IMAGEN.includes(tipo) || (tipo === '' && extensionOk) || tipo.startsWith('image/')
+  const tipoValido =
+    TIPOS_IMAGEN.includes(tipo) ||
+    ((tipo === '' || tipo === 'application/octet-stream') && extensionOk) ||
+    tipo.startsWith('image/')
   if (!tipoValido) {
     return 'Usa una imagen JPG, PNG, WEBP, GIF o SVG.'
   }
@@ -74,6 +77,12 @@ export function validarCuestionario(borrador: BorradorCuestionario): string[] {
         errores.push(`La respuesta ${numero + 1} de la pregunta ${indice + 1} está vacía.`)
       }
     })
+    if (
+      pregunta.segundos !== undefined &&
+      (!Number.isInteger(pregunta.segundos) || pregunta.segundos < 5 || pregunta.segundos > 120)
+    ) {
+      errores.push(`La pregunta ${indice + 1} debe durar entre 5 y 120 segundos.`)
+    }
     if (pregunta.opcionCorrectaId === null && pregunta.respuestaCorrecta === null) {
       errores.push(`Indica la respuesta correcta de la pregunta ${indice + 1}.`)
     }

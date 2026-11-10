@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -7,6 +8,7 @@ import {
 import { IdentidadExterna } from '../autenticacion/identidad-externa';
 import { PrismaService } from '../prisma/prisma.service';
 import { AvisoSesionesLocal } from './aviso-sesiones';
+import { MILISEGUNDOS_CUENTA } from './presentacion-sala';
 import { SesionesJuegoService } from './sesiones-juego.service';
 import { cuestionarioValido, SesionMemoria } from '../../test/sesion-memoria';
 
@@ -38,6 +40,25 @@ async function rechazo(operacion: Promise<unknown>) {
 }
 
 describe('SesionesJuegoService', () => {
+  it('autoriza el canal solo al anfitrión y a participantes registrados', async () => {
+    const { servicio } = armar();
+    const sala = await servicio.crear('quiz-1', ana);
+    await servicio.unirse(sala.codigo, luis);
+
+    await expect(servicio.autorizarCanal(sala.codigo, ana)).resolves.toBe(true);
+    await expect(servicio.autorizarCanal(sala.codigo, luis)).resolves.toBe(
+      true,
+    );
+    await expect(
+      servicio.autorizarCanal(sala.codigo, { id: 'nora', nombre: 'Nora' }),
+    ).resolves.toBe(false);
+  });
+
+  it('deniega el canal si la sala no existe', async () => {
+    const { servicio } = armar();
+    await expect(servicio.autorizarCanal('ZZZZZZ', ana)).resolves.toBe(false);
+  });
+
   it('crea una sala esperando con un código de seis caracteres', async () => {
     const { servicio, avisos } = armar();
     const sala = await servicio.crear('quiz-1', ana);
@@ -115,6 +136,55 @@ describe('SesionesJuegoService', () => {
     );
   });
 
+  it('guarda el avatar elegido y no deja que otra persona lo cambie', async () => {
+    const { servicio, memoria } = armar();
+    const sala = await servicio.crear('quiz-1', ana);
+    const conAvatar = await servicio.unirse(sala.codigo, luis, {
+      nombre: 'Luis',
+      avatarId: 'maga-rosa',
+    });
+    expect(conAvatar.participantes[0]).toMatchObject({
+      perfilId: 'luis',
+      avatarId: 'maga-rosa',
+    });
+
+    const reconexion = await servicio.unirse(sala.codigo, luis, {
+      nombre: 'Luis',
+      avatarId: 'panda-verde',
+    });
+    expect(reconexion.participantes[0].avatarId).toBe('panda-verde');
+
+    const ajena = await servicio.unirse(
+      sala.codigo,
+      { id: 'marta', nombre: 'Marta' },
+      { avatarId: 'dinosaurio-verde' },
+    );
+    expect(
+      ajena.participantes.find((item) => item.perfilId === 'luis')?.avatarId,
+    ).toBe('panda-verde');
+    expect(
+      ajena.participantes.find((item) => item.perfilId === 'marta')?.avatarId,
+    ).toBe('dinosaurio-verde');
+
+    const invalido = await servicio.unirse(
+      sala.codigo,
+      { id: 'nora', nombre: 'Nora' },
+      { avatarId: 'no es valido' },
+    );
+    expect(
+      invalido.participantes.find((item) => item.perfilId === 'nora')?.avatarId,
+    ).toBeUndefined();
+
+    memoria.sesiones[0].estado = 'pregunta';
+    const durante = await servicio.unirse(sala.codigo, luis, {
+      nombre: 'Luis',
+      avatarId: 'gato-naranja',
+    });
+    expect(
+      durante.participantes.find((item) => item.perfilId === 'luis')?.avatarId,
+    ).toBe('panda-verde');
+  });
+
   it('incorpora participantes sin duplicarlos y rechaza una sala finalizada', async () => {
     const { servicio, memoria, avisos } = armar();
     const sala = await servicio.crear('quiz-1', ana);
@@ -188,11 +258,13 @@ describe('SesionesJuegoService', () => {
     const antes = Date.now();
     const iniciada = await servicio.iniciar(sala.codigo, ana);
     const limite = new Date(iniciada.cierraEn ?? 0).getTime();
+    const abre = new Date(iniciada.abreEn ?? 0).getTime();
     expect(iniciada.estado).toBe('pregunta');
     expect(iniciada.preguntaActual).toBe(0);
     expect(iniciada.segundos).toBe(15);
-    expect(limite).toBeGreaterThanOrEqual(antes + 15_000);
-    expect(limite).toBeLessThanOrEqual(Date.now() + 15_000);
+    expect(limite - abre).toBe(15_000);
+    expect(abre).toBeGreaterThanOrEqual(antes + MILISEGUNDOS_CUENTA);
+    expect(limite).toBeLessThanOrEqual(Date.now() + 15_000 + MILISEGUNDOS_CUENTA);
     expect(JSON.stringify(iniciada)).not.toContain('correcta');
     expect(
       memoria.sesiones[0].preguntasInstantanea?.preguntas[0],
@@ -471,6 +543,68 @@ describe('SesionesJuegoService', () => {
     expect(error.getResponse().mensaje).toBe(
       'La base de datos no está disponible.',
     );
+  });
+
+  it('solo matricula en el curso a quien entra a una evaluación', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({ id: 'curso-1', nombre: 'Paradigmas', docenteId: 'ana' });
+    memoria.matriculas.push({ cursoId: 'curso-1', estudianteId: 'luis' });
+    const sala = await servicio.crear('quiz-1', ana, {
+      modo: 'evaluacion',
+      cursoId: 'curso-1',
+      nombreEvaluacion: 'Quiz 1',
+      notaMaxima: 100,
+      valorPorcentaje: 10,
+      notaMinima: 70,
+    });
+    expect(sala.evaluacion).toMatchObject({
+      cursoId: 'curso-1',
+      nombre: 'Quiz 1',
+      valorPorcentaje: 10,
+    });
+    await expect(servicio.unirse(sala.codigo, luis)).resolves.toMatchObject({
+      codigo: sala.codigo,
+    });
+    const ajeno = await rechazo(
+      servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' }),
+    );
+    expect(ajeno).toBeInstanceOf(ForbiddenException);
+  });
+
+  it('matricula en el curso por defecto a quien entra con su cuenta', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({
+      id: 'curso-paradigmas',
+      nombre: 'Paradigmas de Programación',
+      docenteId: 'ana',
+    });
+    const sala = await servicio.crear('quiz-1', ana, {
+      modo: 'evaluacion',
+      cursoId: 'curso-paradigmas',
+      valorPorcentaje: 10,
+    });
+    await expect(servicio.unirse(sala.codigo, { id: 'nueva', nombre: 'Nueva' })).resolves.toMatchObject({
+      codigo: sala.codigo,
+    });
+    expect(memoria.matriculas).toEqual(
+      expect.arrayContaining([{ cursoId: 'curso-paradigmas', estudianteId: 'nueva' }]),
+    );
+  });
+
+  it('no deja entrar a una partida del curso a quien no está matriculado', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({ id: 'curso-1', nombre: 'Paradigmas', docenteId: 'ana' });
+    const sala = await servicio.crear('quiz-1', ana, { modo: 'practica', cursoId: 'curso-1' });
+    const ajeno = await rechazo(servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' }));
+    expect(ajeno).toBeInstanceOf(ForbiddenException);
+  });
+
+  it('no abre una evaluación sin curso del docente', async () => {
+    const { servicio } = armar();
+    const error = await rechazo(
+      servicio.crear('quiz-1', ana, { modo: 'evaluacion', valorPorcentaje: 10 }),
+    );
+    expect(error).toBeInstanceOf(BadRequestException);
   });
 });
 

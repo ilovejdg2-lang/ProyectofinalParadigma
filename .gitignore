@@ -10,6 +10,9 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.production.example
+!.env.local.example
+.local/
 *.key
 datos/keys/
 datos/keys-test/
@@ -20,6 +23,9 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# Fotos subidas en local. En Docker viven en el volumen profelink-local-imagenes.
+actividades/almacen-imagenes/
 
 # Pruebas visuales
 playwright-report/
