@@ -159,7 +159,7 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
                 <p className="aviso">Un administrador tiene que aceptar la cuenta antes de que puedas entrar.</p>
               ) : null}
             </fieldset>
-          )}
+          ) : null}
           {aviso ? <p className="aviso" role="status">{aviso}</p> : null}
           {errores.length > 0 ? (
             <ul className="lista-errores acceso-errores">
