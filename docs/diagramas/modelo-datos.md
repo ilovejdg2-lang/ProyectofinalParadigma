@@ -119,6 +119,12 @@ erDiagram
     string estado
     int preguntaActual
     json preguntasInstantanea
+    string modalidad
+    boolean minijuegosActivos
+    stringArray tiposMinijuego
+    int cadaPreguntas
+    int duracionMinijuego
+    boolean velocidadActiva
   }
   Participante {
     string id PK
@@ -127,6 +133,8 @@ erDiagram
     string nombre
     boolean conectado
     int puntaje
+    int puntosMinijuegos
+    int bonificacionVelocidad
   }
   Respuesta {
     string id PK
@@ -147,6 +155,11 @@ erDiagram
     int incorrectas
   }
 ```
+
+`SesionJuego.estado` usa el enum `EstadoSesion`: `esperando`, `pregunta`,
+`cerrada`, `clasificacion` y `minijuego`. Las opciones de minijuegos se guardan
+en `SesionJuego`; sus puntos y la bonificación de velocidad quedan asociados
+a cada `Participante`.
 
 ## Referencias lógicas, sin clave foránea
 
