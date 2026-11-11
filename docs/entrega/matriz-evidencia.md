@@ -4,6 +4,10 @@ Registro del 2026-11-09 actualizado el 2026-11-09 (noche, hora local) con una co
 
 No se enviaron partidas, cargas ni escrituras a producción. No se marcaron teléfonos físicos: los clientes eran procesos Node en esta máquina. La demo del 2026-11-07 (un docente y un estudiante) no se repitió.
 
+Para completar la evidencia pendiente entre dispositivos físicos y preparar la
+defensa, seguir [el guion de defensa y dispositivos](defensa-y-dispositivos.md).
+La existencia del guion no cambia los estados observados en esta matriz.
+
 | Caso | Qué hay registrado antes | Qué se observó el 2026-11-09 (noche) | Estado |
 | --- | --- | --- | --- |
 | Varios dispositivos o participantes | [Demo punta a punta](../evidencias/demo-punta-a-punta-2026-11-07.md): un docente y un estudiante. | 8 participantes entraron a la sala `RMER3Z` desde clientes Node distintos en esta máquina. No son teléfonos físicos. | Observado en localhost. No sustituye una demo con varios dispositivos físicos. |
