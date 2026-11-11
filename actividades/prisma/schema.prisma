@@ -51,6 +51,8 @@ model Cuestionario {
   etiquetas     String[]
   dificultad    Dificultad
   esDemostracion Boolean   @default(false)
+  /// Visible en el catálogo. En privado solo lo ve y lo inicia quien lo creó.
+  publico       Boolean    @default(true)
   /// Puntos que suma un acierto. El error y la falta de respuesta valen 0.
   puntosPorAcierto Int     @default(1)
   imagenId      String?

@@ -29,8 +29,6 @@ export async function entrar(pagina: Page, correo: string, contrasena = CLAVE) {
   await pagina.goto('/iniciar-sesion')
   await pagina.locator('input[type="email"]').fill(correo)
   await pagina.locator('input[type="password"]').fill(contrasena)
-  const comoEstudiante = correo.endsWith('@est.una.ac.cr')
-  await pagina.getByRole('button', { name: comoEstudiante ? 'Estudiante' : 'Profesor' }).click()
   await pagina.getByRole('button', { name: 'Iniciar Sesión' }).click()
   await expect(pagina).not.toHaveURL(/iniciar-sesion/)
   if (new URL(pagina.url()).pathname === '/elegir') {

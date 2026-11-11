@@ -145,29 +145,6 @@ describe('AuthService & Dominio de Políticas de Correo', () => {
       expect(res.perfil.correo).toBe('profesor@una.cr');
     });
 
-    it('al iniciar sesión puede elegir ser estudiante o profesor', async () => {
-      const comoEstudiante = await authService.iniciarSesion({
-        correo: 'profesor@una.cr',
-        contrasena: 'Profesor123!',
-        rol: 'student',
-      } as any);
-      expect(comoEstudiante.perfil.rol).toBe('student');
-
-      const comoProfesor = await authService.iniciarSesion({
-        correo: 'profesor@una.cr',
-        contrasena: 'Profesor123!',
-        rol: 'teacher',
-      } as any);
-      expect(comoProfesor.perfil.rol).toBe('teacher');
-
-      const admin = await authService.iniciarSesion({
-        correo: 'admin@una.cr',
-        contrasena: 'Admin123!',
-        rol: 'student',
-      } as any);
-      expect(admin.perfil.rol).toBe('admin');
-    });
-
     it('inicia sesión con el estudiante demo sembrado', async () => {
       const res = await authService.iniciarSesion({
         correo: 'estudiante@est.una.ac.cr',
@@ -197,8 +174,48 @@ describe('AuthService & Dominio de Políticas de Correo', () => {
         obtenerPassword() { return 'Segura1234!'; },
       } as any);
 
-      expect(res.perfil.rol).toBe('teacher');
-      expect(res.perfil.correo).toBe('maria.vargas@una.cr');
+      expect('perfil' in res && res.perfil.rol).toBe('teacher');
+      expect('perfil' in res && res.perfil.correo).toBe('maria.vargas@una.cr');
+    });
+
+    it('guarda el rol elegido al crear la cuenta', async () => {
+      const estudiante = await authService.registrar({
+        nombre: 'Luis Mora',
+        correo: 'luis.mora@una.cr',
+        contrasena: 'Segura1234!',
+        rol: 'student',
+      } as any);
+      expect('perfil' in estudiante && estudiante.perfil.rol).toBe('student');
+
+      const profesor = await authService.registrar({
+        nombre: 'Ana Solis',
+        correo: 'ana.solis@gmail.com',
+        contrasena: 'Segura1234!',
+        rol: 'teacher',
+      } as any);
+      expect(profesor).toMatchObject({ pendiente: true });
+
+      await expect(
+        authService.iniciarSesion({
+          correo: 'ana.solis@gmail.com',
+          contrasena: 'Segura1234!',
+        } as any),
+      ).rejects.toThrow('espera la aceptación');
+
+      const admin = await authService.iniciarSesion({
+        correo: 'admin@una.cr',
+        contrasena: 'Admin123!',
+      } as any);
+      const claims = keysService.verificarAccessToken(admin.token);
+      const pendientes = await authService.listarProfesoresPendientes(claims?.role);
+      expect(pendientes.map((item) => item.correo)).toContain('ana.solis@gmail.com');
+      await authService.aceptarProfesor(claims?.role, pendientes[0].id);
+
+      const aceptado = await authService.iniciarSesion({
+        correo: 'ana.solis@gmail.com',
+        contrasena: 'Segura1234!',
+      } as any);
+      expect(aceptado.perfil.rol).toBe('teacher');
     });
   });
 

@@ -28,6 +28,7 @@ export interface CuestionarioPublico {
   preguntas: PreguntaPublica[];
   imagenUrl?: string;
   esDemostracion: boolean;
+  publico: boolean;
   puntosPorAcierto: number;
   actualizadoEn: string;
 }
@@ -61,6 +62,7 @@ export interface FilaCuestionario {
   autorId: string;
   autorNombre: string;
   esDemostracion: boolean;
+  publico?: boolean;
   puntosPorAcierto?: number;
   actualizadoEn: Date | string;
   eliminadoEn?: Date | string | null;
@@ -83,6 +85,7 @@ export function presentar(
     autorId: fila.autorId,
     autorNombre: fila.autorNombre,
     esDemostracion: fila.esDemostracion,
+    publico: fila.publico !== false,
     puntosPorAcierto: puntosPorAciertoDe(fila.puntosPorAcierto),
     actualizadoEn: new Date(fila.actualizadoEn).toISOString(),
     ...(imagenUrl ? { imagenUrl } : {}),

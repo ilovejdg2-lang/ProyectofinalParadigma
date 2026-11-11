@@ -270,6 +270,29 @@ export class AlmacenUsuariosHibrido extends AlmacenUsuarios implements OnModuleI
     };
   }
 
+  async listarProfesoresPendientes(): Promise<UsuarioEntidad[]> {
+    if (!this.prisma.estaListo()) {
+      return this.memoria.listarProfesoresPendientes();
+    }
+    const db = this.prisma.obtener();
+    const filas = await db.user.findMany({
+      where: { role: 'teacher', status: 'PendingApproval' },
+      orderBy: { createdAt: 'asc' },
+    });
+    return filas.map((u) => ({
+      id: u.id,
+      email: u.email,
+      passwordHash: u.passwordHash,
+      displayName: u.displayName,
+      role: u.role as RolUsuario,
+      emailVerified: u.emailVerified,
+      institutionId: u.institutionId,
+      status: u.status as EstadoUsuario,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+    }));
+  }
+
   async listarPoliticas(): Promise<EntidadPoliticaDominio[]> {
     if (!this.prisma.estaListo()) {
       return this.memoria.listarPoliticas();

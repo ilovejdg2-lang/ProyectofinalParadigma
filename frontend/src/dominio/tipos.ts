@@ -58,6 +58,7 @@ export interface Cuestionario {
   preguntas: Pregunta[]
   imagenUrl?: string
   esDemostracion: boolean
+  publico?: boolean
   puntosPorAcierto?: number
   actualizadoEn: string
 }
@@ -88,6 +89,7 @@ export interface BorradorCuestionario {
   imagenUrl?: string
   imagenSimulada: boolean
   puntosPorAcierto: number
+  publico: boolean
   preguntas: BorradorPregunta[]
 }
 

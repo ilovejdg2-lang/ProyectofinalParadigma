@@ -7,6 +7,7 @@ import {
   Headers,
   HttpCode,
   Ip,
+  Param,
   Patch,
   Post,
   Put,
@@ -64,6 +65,27 @@ export class AuthController {
   @HttpCode(200)
   loginFrontend(@Body() datos: LoginDto, @Ip() ip: string) {
     return this.auth.iniciarSesion(datos, ip);
+  }
+
+  @Get('profesores/pendientes')
+  listarProfesores(@Headers('authorization') authHeader?: string) {
+    const claims = this.exigirSesion(authHeader);
+    return this.auth.listarProfesoresPendientes(claims.role);
+  }
+
+  @Post('profesores/:id/aceptar')
+  @HttpCode(200)
+  aceptarProfesor(@Param('id') id: string, @Headers('authorization') authHeader?: string) {
+    const claims = this.exigirSesion(authHeader);
+    return this.auth.aceptarProfesor(claims.role, id);
+  }
+
+  private exigirSesion(authHeader?: string) {
+    const token = extraerTokenBearer(authHeader);
+    if (!token) throw new UnauthorizedException({ mensaje: 'No autorizado.' });
+    const claims = this.keys.verificarAccessToken(token);
+    if (!claims) throw new UnauthorizedException({ mensaje: 'Token inválido o expirado.' });
+    return claims;
   }
 
   // 3. Rotación de Refresh Token
