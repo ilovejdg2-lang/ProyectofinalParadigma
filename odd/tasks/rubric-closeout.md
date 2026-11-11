@@ -11,10 +11,10 @@ Forecast: approximately 300 authored lines excluding generated lockfile churn; r
 - S6. Professor requirement: oral defense/demo, 5 of 40 points. Acceptance: prepare a concise defense runbook grounded in verified features and evidence; actual grading remains unverified.
 
 ## Tasks
-- T1 [S2] inline, complete in 08fbe24: added Scalar/OpenAPI with /docs and /docs-json preserved; Node 22 Jest/build and live route smoke passed (Risk: item 5, dependency).
+- T1 [S2] inline, implementation complete in 08fbe24: added Scalar/OpenAPI with /docs and /docs-json preserved; Node 22 Jest/build and live route smoke passed. Production verification remains pending deployment (Risk: item 5, dependency).
 - T2 [S3] inline, complete in 0692a56: data diagram includes eight minigame fields and EstadoSesion.minijuego; structural comparison passed.
-- T3 [S4,S6] inline, procedure complete in 1f2ca9a: multi-device evidence and defense runbook prepared; physical-device execution and professor's grading remain pending.
-- T4 [S5] inline, pending: confirm Docker Hub destination and publication authorization, publish and verify if granted; separate delivery decision.
+- T3 [S4,S6] inline, partial in 1f2ca9a: defense runbook prepared and team reports successful physical-device gameplay with matching questions/timers; supporting screenshots and device/network/browser metadata remain pending, and professor's grading is unknown.
+- T4 [S5] inline, complete: public Docker Hub images for auth-service, actividades, and frontend were anonymously pull-verified with tags `:ebbe61a` and `:latest`; they were built from base commit `ebbe61a` and do not include this branch's later changes.
 
 ## Log
 - L1 (2026-11-11): "entonces vamos con las cosas que nos faltan"
@@ -23,3 +23,4 @@ Forecast: approximately 300 authored lines excluding generated lockfile churn; r
 - L4 (2026-11-11): T2 structural check compared eight new minigame field names and EstadoSesion.minijuego between Prisma schema and Mermaid document; all found. Commit 0692a56.
 - L5 (2026-11-11): T3 documentation readback confirms guide distinguishes a physical-device run from prior one-PC Node clients and does not claim unobserved execution. Commit 1f2ca9a. T4 remains blocked on Docker Hub namespace and explicit publication authorization.
 - L6 (2026-11-11): Native review approved and acknowledged for target sha256:1eb55a418e9aac6160a9f32afeeee72bd69a5c5e0831dc809fa9a646e3c715e6; three lenses returned no findings. Receipt is informational; no publish, push, merge, or deploy authority granted.
+- L7 (2026-11-11): User authorized continuing the remaining closeout. Reconciled the matrix/runbook with the user's report that physical-device gameplay worked and with verified public Docker Hub tags. Kept the physical test as team-reported because screenshots/context were not supplied. The branch has five commits ahead of origin/main; Auth Scalar remains unmerged and production verification is pending.

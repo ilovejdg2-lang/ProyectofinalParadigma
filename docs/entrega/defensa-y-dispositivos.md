@@ -1,9 +1,11 @@
 # Guion de defensa y prueba entre dispositivos
 
-Esta guía es un procedimiento, **no evidencia de una prueba ya realizada**. La
-[matriz de evidencia](matriz-evidencia.md) registra ocho clientes Node en una
-sola computadora; eso no demuestra que el flujo funcione entre teléfonos o
-computadoras distintos.
+Esta guía es un procedimiento reproducible. La [matriz de
+evidencia](matriz-evidencia.md) conserva la corrida observada con ocho clientes
+Node en una computadora y registra, por separado, el reporte del equipo de una
+prueba posterior con varios dispositivos físicos. El equipo informó preguntas
+y tiempos coincidentes y partidas normales; todavía faltan capturas y datos de
+contexto para documentar esa prueba de forma verificable.
 
 ## Preparación de la demostración
 
@@ -31,7 +33,8 @@ computadoras distintos.
    que el resultado persiste. Si se prueba reconexión, registrar por separado
    el corte de red y el estado tras recuperar la conexión.
 5. Guardar capturas de las dos vistas sin tokens ni datos sensibles y anotar
-   resultado observado, HTTP o mensaje de error, y cualquier paso no ejecutado.
+   fecha/hora, tipo de dispositivo, navegador, red y resultado observado. No
+   presentar como inspeccionada una evidencia que no se haya adjuntado.
 
 No marcar este caso como completado si solo se usaron dos pestañas o procesos
 en la misma computadora. Tampoco tomar la existencia de un endpoint como prueba
@@ -57,8 +60,12 @@ de su funcionamiento desde otra red.
 - **Observabilidad:** las APIs instrumentadas exportaron trazas a Grafana/Tempo
   local, según [monitoreo y aportes](monitoreo-y-aportes.md). No presentar esa
   evidencia local como un panel público de producción.
-- **Límites conocidos:** las imágenes todavía no están verificadas en Docker
-  Hub y esta guía aún no documenta una ejecución real entre dispositivos.
+- **Límites conocidos:** las tres imágenes fueron publicadas y descargadas
+  anónimamente desde Docker Hub con las etiquetas `:ebbe61a` y `:latest`, pero
+  se construyeron desde el código base `ebbe61a`, antes de integrar esta rama.
+  La prueba física está reportada por el equipo, pero falta adjuntar su
+  evidencia contextual. La Scalar de Autenticación debe verificarse en
+  producción después de integrar y desplegar el cambio.
 
 La calificación de la defensa depende de la presentación y de las preguntas
 del profesor; no puede certificarse solo con documentación.
