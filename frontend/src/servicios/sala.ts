@@ -747,6 +747,7 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
       let cerrado = false
       let socket: WebSocket | null = null
       let espera: number | undefined
+      let latido: number | undefined
       let intento = 0
 
       const avisar = (estado: EstadoConexion) => {
@@ -759,6 +760,10 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
         if (espera !== undefined) {
           window.clearTimeout(espera)
           espera = undefined
+        }
+        if (latido !== undefined) {
+          window.clearInterval(latido)
+          latido = undefined
         }
         if (socket) {
           socket.onclose = null
@@ -773,6 +778,9 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
           if (socket !== actual) return
           intento = 0
           avisar('conectado')
+          latido = window.setInterval(() => {
+            if (actual.readyState === WebSocket.OPEN) actual.send(JSON.stringify({ evento: 'latido' }))
+          }, 15_000)
           void enviar(token, `/sesiones-juego/${encodeURIComponent(codigo)}`, 'GET')
             .then((sala) => {
               if (socket === actual) alCambiar(sala)
@@ -783,6 +791,10 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
           if (socket === actual) avisar('error')
         }
         actual.onclose = () => {
+          if (latido !== undefined) {
+            window.clearInterval(latido)
+            latido = undefined
+          }
           if (cerrado || socket !== actual) return
           avisar('desconectado')
           const pausa = Math.min(4000, 300 * 2 ** intento)
@@ -809,6 +821,7 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
         cerrado = true
         if (reabrir === forzar) reabrir = null
         if (espera !== undefined) window.clearTimeout(espera)
+        if (latido !== undefined) window.clearInterval(latido)
         if (socket) {
           socket.onclose = null
           socket.close()

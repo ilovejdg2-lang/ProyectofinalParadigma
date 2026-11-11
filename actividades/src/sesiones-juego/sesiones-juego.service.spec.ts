@@ -354,20 +354,21 @@ describe('SesionesJuegoService', () => {
     });
   });
 
-  it('no admite un participante nuevo después de iniciar y conserva al que ya estaba', async () => {
+  it('admite un participante nuevo después de iniciar y conserva al que ya estaba', async () => {
     const { servicio } = armar();
     const sala = await servicio.crear('quiz-1', ana);
     await servicio.unirse(sala.codigo, luis);
     await servicio.iniciar(sala.codigo, ana);
-    const tarde = await rechazo(
-      servicio.unirse(sala.codigo, { id: 'marta', nombre: 'Marta' }),
+    const tarde = await servicio.unirse(sala.codigo, { id: 'marta', nombre: 'Marta' });
+    expect(tarde.participantes.map((item) => item.nombre)).toEqual(
+      expect.arrayContaining(['Luis', 'Marta']),
     );
-    expect(tarde.getResponse().mensaje).toBe('La partida ya fue iniciada.');
+    expect(tarde.estado).toBe('pregunta');
     const reconexion = await servicio.unirse(sala.codigo, {
       id: 'luis',
       nombre: 'Luis',
     });
-    expect(reconexion.participantes).toHaveLength(1);
+    expect(reconexion.participantes).toHaveLength(2);
     expect(reconexion.estado).toBe('pregunta');
   });
 
