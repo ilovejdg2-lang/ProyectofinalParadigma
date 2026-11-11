@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegistroDto {
   @IsOptional()
@@ -26,6 +26,16 @@ export class RegistroDto {
   @IsString()
   @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
   password?: string;
+
+  @IsOptional()
+  @IsIn(['teacher', 'student'])
+  rol?: 'teacher' | 'student';
+}
+
+export function extraerRolRegistro(datos: any): 'teacher' | 'student' | null {
+  const val = datos?.rol;
+  if (val === 'teacher' || val === 'student') return val;
+  return null;
 }
 
 export function extraerNombreRegistro(datos: any): string {

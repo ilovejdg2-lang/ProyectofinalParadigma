@@ -1,6 +1,11 @@
 export type RolUsuario = 'teacher' | 'student' | 'admin';
 
-export type EstadoUsuario = 'Active' | 'Locked' | 'PendingVerification';
+export type EstadoUsuario = 'Active' | 'Locked' | 'PendingVerification' | 'PendingApproval';
+
+export interface RegistroPendiente {
+  pendiente: true;
+  mensaje: string;
+}
 
 export interface PerfilPublico {
   id: string;

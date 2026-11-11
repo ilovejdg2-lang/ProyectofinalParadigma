@@ -26,6 +26,7 @@ import { Perfil } from '../paginas/Perfil.tsx'
 import { ResultadoEvaluacion } from '../paginas/ResultadoEvaluacion.tsx'
 import { Resultados } from '../paginas/Resultados.tsx'
 import { SalaAnfitrion } from '../paginas/SalaAnfitrion.tsx'
+import { Solicitudes } from '../paginas/Solicitudes.tsx'
 import { Unirse } from '../paginas/Unirse.tsx'
 
 export function RutaProtegida() {
@@ -67,6 +68,7 @@ export function rutasAplicacion() {
             { path: '/evaluaciones/:codigo', element: <ResultadoEvaluacion /> },
             { path: '/historial', element: <Historial /> },
             { path: '/perfil', element: <Perfil /> },
+            { path: '/solicitudes', element: <Solicitudes /> },
             { path: '/mis-cuestionarios', element: <MisCuestionarios /> },
             { path: '/cuestionarios/nuevo', element: <EditorCuestionario /> },
             { path: '/cuestionarios/:id/editar', element: <EditorCuestionario /> },

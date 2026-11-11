@@ -122,6 +122,21 @@ describe('CuestionariosService', () => {
     expect(JSON.stringify(ajeno)).not.toContain('"correcta"');
   });
 
+  it('oculta un cuestionario privado del catálogo y de otras personas', async () => {
+    const creado = await servicio.crear(entrada({ publico: false }), ana);
+    expect(creado.publico).toBe(false);
+    expect(await servicio.listar({})).toHaveLength(0);
+    expect((await servicio.mios(ana)).map((item) => item.id)).toContain(creado.id);
+    const dueno = await servicio.obtener(creado.id, 'Bearer token-ana');
+    expect(dueno.publico).toBe(false);
+    await expect(servicio.obtener(creado.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(servicio.obtener(creado.id, 'Bearer token-luis')).rejects.toBeInstanceOf(NotFoundException);
+
+    const publicado = await servicio.actualizar(creado.id, entrada({ publico: true }), ana);
+    expect(publicado.publico).toBe(true);
+    expect(await servicio.listar({})).toHaveLength(1);
+  });
+
   it('rechaza datos inválidos y varias respuestas correctas', async () => {
     await expect(
       servicio.crear(entrada({ titulo: 'No' }), ana),

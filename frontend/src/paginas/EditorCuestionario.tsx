@@ -89,6 +89,7 @@ function borradorVacio(): BorradorCuestionario {
     dificultad: 'medio',
     imagenSimulada: false,
     puntosPorAcierto: 1,
+    publico: true,
     preguntas: [preguntaVerdaderoFalso()],
   }
 }
@@ -139,6 +140,7 @@ export function EditorCuestionario() {
           imagenUrl: cuestionario.imagenUrl,
           imagenSimulada: false,
           puntosPorAcierto: cuestionario.puntosPorAcierto ?? 1,
+          publico: cuestionario.publico !== false,
           preguntas: cuestionario.preguntas.map((pregunta) => ({
             id: pregunta.id,
             enunciado: pregunta.enunciado,
@@ -302,6 +304,7 @@ export function EditorCuestionario() {
         dificultad: borrador.dificultad,
         imagenUrl: borrador.imagenUrl,
         puntosPorAcierto: borrador.puntosPorAcierto,
+        publico: borrador.publico,
         preguntas: borrador.preguntas.map((pregunta, indice) => ({
           id: pregunta.id,
           enunciado: pregunta.enunciado.trim(),
@@ -470,6 +473,22 @@ export function EditorCuestionario() {
               />
               <small>Por defecto es 1. Un error o una respuesta que no llega valen 0. El podio desempata por rapidez.</small>
             </label>
+            <fieldset className="campo-grupo visibilidad">
+              <legend>Quién puede verlo</legend>
+              <div className="visibilidad-opciones">
+                <button type="button" aria-pressed={borrador.publico} onClick={() => actualizar({ publico: true })}>
+                  Público
+                </button>
+                <button type="button" aria-pressed={!borrador.publico} onClick={() => actualizar({ publico: false })}>
+                  Privado
+                </button>
+              </div>
+              <small>
+                {borrador.publico
+                  ? 'Aparece en Descubrir y cualquiera puede iniciar una partida.'
+                  : 'Solo tú lo ves y solo tú puedes iniciar la partida.'}
+              </small>
+            </fieldset>
             <label className="campo-grupo">
               <span>Etiquetas, separadas por coma</span>
               <input className="campo" value={borrador.etiquetas} onChange={(evento) => actualizar({ etiquetas: evento.target.value })} />
