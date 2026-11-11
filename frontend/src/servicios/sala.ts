@@ -180,7 +180,6 @@ export function crearSalaSimulada(
     cancelarReloj(sala.codigo)
     const pregunta = sala.preguntas[sala.preguntaActual]
     if (!pregunta || sala.estado !== 'pregunta') return
-    const limite = (pregunta.segundos && pregunta.segundos >= 5 ? pregunta.segundos : sala.segundos) * 1000
     const inicio = sala.iniciaEn ? new Date(sala.iniciaEn).getTime() : Date.now()
     const ids = new Set(sala.elegibles?.length ? sala.elegibles : sala.participantes.map((item) => item.id))
     for (const participante of sala.participantes) {
@@ -446,6 +445,7 @@ export function crearSalaSimulada(
           finalizadaEn: new Date().toISOString(),
           anfitrionId: sala.anfitrionId,
           participantes: sala.participantes.map((item) => ({ ...item, respuestas: [...item.respuestas] })),
+          preguntas: sala.preguntas.map((pregunta) => ({ ...pregunta, opciones: pregunta.opciones?.map((opcion) => ({ ...opcion })) })),
         })
         const resultados = leerResultados(almacen).filter((item) => item.codigo !== sala.codigo)
         resultados.unshift(resumen)
@@ -508,6 +508,10 @@ export function crearSalaSimulada(
             respuestas: validado.respuestas,
           },
         ],
+        preguntas: cuestionario.preguntas.map((pregunta) => ({
+          ...pregunta,
+          opciones: pregunta.opciones?.map((opcion) => ({ ...opcion })),
+        })),
       })
 
       existentes.unshift(resumen)

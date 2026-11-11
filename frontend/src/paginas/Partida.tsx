@@ -15,6 +15,7 @@ import { FlujoIngreso, type FichaIngreso } from '../juego/FlujoIngreso.tsx'
 import { CuentaRegresiva } from '../juego/CuentaRegresiva.tsx'
 import { FondoJuego } from '../juego/FondoJuego.tsx'
 import { OpcionesJuego } from '../juego/OpcionesJuego.tsx'
+import { rachaDe } from '../juego/racha.ts'
 import { cuentaActiva, paisajeDe } from '../juego/ronda.ts'
 import { Temporizador } from '../juego/Temporizador.tsx'
 import { useSala } from './useSala.ts'
@@ -42,16 +43,17 @@ export function Partida() {
     const anterior = fase.current
     fase.current = marcaFase
     if (!anterior) return
-    if (sala.estado === 'pregunta') audio.efecto('jugar')
-    if (sala.estado === 'clasificacion') audio.efecto('clasificacion')
-    if (sala.estado === 'finalizada') audio.efecto('podio')
+    if (sala.estado === 'pregunta') audio.efecto('jugar', `jugar-${sala.preguntaActual}`)
+    if (sala.estado === 'clasificacion') audio.efecto('clasificacion', `clasif-${sala.preguntaActual}`)
     if (sala.estado !== 'cerrada') return
     const pregunta = sala.preguntas[sala.preguntaActual]
     const yo = sala.participantes.find((item) => item.perfilId === perfil.id)
     const respuesta = pregunta ? yo?.respuestas.find((item) => item.preguntaId === pregunta.id && item.aceptada) : undefined
-    if (!respuesta) audio.efecto('tiempo')
-    else if (respuesta.puntos > 0) audio.efecto('correcto')
-    else audio.efecto('incorrecto')
+    if (!respuesta) audio.efecto('tiempo', `tiempo-${sala.preguntaActual}`)
+    else if (respuesta.puntos > 0) {
+      const racha = rachaDe(yo, sala.preguntas)
+      audio.efecto(racha >= 3 ? 'racha' : 'correcto', `resultado-${sala.preguntaActual}`)
+    } else audio.efecto('incorrecto', `resultado-${sala.preguntaActual}`)
   }, [marcaFase, perfil, sala])
 
   if (cargando) return <EstadoCarga texto="Entrando a la partida…" />
@@ -101,7 +103,6 @@ export function Partida() {
     setEnviando(true)
     try {
       await cliente.responder(token, sala!.codigo, opcionId)
-      audio.efecto('enviado')
       setAviso('Respuesta enviada. No puedes cambiarla.')
     } catch (err) {
       setAviso(mensajeDe(err))
@@ -132,9 +133,15 @@ export function Partida() {
       {enCuenta && sala.abreEn ? <CuentaRegresiva abreEn={sala.abreEn} ahora={ahora} /> : null}
       {sala.estado === 'finalizada' ? (
         <section className="final-partida">
-          <h1>Partida terminada</h1>
+          <header className="final-encabezado">
+            <p className="meta">Clasificación final</p>
+            <h1>{sala.titulo}</h1>
+          </header>
           <Podio participantes={sala.participantes} perfilId={perfil?.id} />
-          <Link className="boton" to={`/resultados/${sala.codigo}`}>Ver reporte</Link>
+          <div className="final-acciones">
+            <Link className="boton" to={`/resultados/${sala.codigo}`}>Ver reporte</Link>
+            <Link className="boton-fantasma" to="/">Salir</Link>
+          </div>
         </section>
       ) : null}
       {pregunta && !enCuenta && sala.estado === 'pregunta' ? (
@@ -159,6 +166,7 @@ export function Partida() {
           respuesta={respuesta}
           total={participante?.puntaje ?? 0}
           correcta={textoCorrecto(pregunta)}
+          racha={rachaDe(participante, sala.preguntas)}
         />
       ) : null}
       {pregunta && sala.estado === 'clasificacion' ? (

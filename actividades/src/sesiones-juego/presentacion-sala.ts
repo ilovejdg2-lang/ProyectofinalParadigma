@@ -374,6 +374,8 @@ export interface ResumenPublico {
   finalizadaEn: string;
   anfitrionId: string;
   participantes: ParticipantePublico[];
+  /** Preguntas reveladas de la partida, para el reporte del docente. */
+  preguntas: SalaPublica['preguntas'];
 }
 
 export function presentarResultado(fila: FilaSesion): ResumenPublico {
@@ -386,6 +388,7 @@ export function presentarResultado(fila: FilaSesion): ResumenPublico {
       : new Date(0).toISOString(),
     anfitrionId: sala.anfitrionId,
     participantes: ordenarClasificacion(sala.participantes),
+    preguntas: sala.preguntas,
   };
 }
 

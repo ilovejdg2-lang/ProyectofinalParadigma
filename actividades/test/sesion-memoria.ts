@@ -594,3 +594,9 @@ export function cuestionarioValido(id = 'quiz-1'): CuestionarioMemoria {
     ],
   };
 }
+
+export async function esperarApertura(sala: { abreEn: string | null }) {
+  if (!sala.abreEn) throw new Error('La primera pregunta no tiene hora de apertura.');
+  const espera = new Date(sala.abreEn).getTime() - Date.now();
+  if (espera > 0) await new Promise<void>((resolve) => setTimeout(resolve, espera));
+}

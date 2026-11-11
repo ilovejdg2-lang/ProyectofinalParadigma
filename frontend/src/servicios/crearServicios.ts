@@ -13,7 +13,11 @@ export interface Servicios {
 
 export function crearServicios(opciones?: { entorno?: Entorno; almacen?: Almacen }): Servicios {
   const entorno = opciones?.entorno ?? leerEntorno()
-  const usarSimulacion = opciones?.almacen !== undefined || entorno.simulacion || !entorno.authUrl || !entorno.actividadesUrl
+  const modoPrueba = opciones?.almacen !== undefined
+  const apisListas = Boolean(entorno.authUrl && entorno.actividadesUrl)
+  // Simulación: pruebas unitarias, flag explícito, o APIs sin configurar.
+  // VITE_USAR_SIMULACION=true fuerza la simulación aunque existan URLs en .env.
+  const usarSimulacion = modoPrueba || entorno.simulacion || !apisListas
   if (usarSimulacion) {
     const almacen = opciones?.almacen ?? almacenLocal()
     const autenticacion = crearAutenticacionSimulada(almacen)

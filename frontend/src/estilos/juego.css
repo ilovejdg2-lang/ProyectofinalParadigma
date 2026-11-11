@@ -2,6 +2,8 @@
 .sala-espera,
 .partida.escenario {
   position: relative;
+  color-scheme: dark;
+  color: #f3f7fb;
 }
 
 .ingreso-partida {
@@ -9,9 +11,26 @@
   display: grid;
   place-items: center;
   padding: 24px 16px 40px;
+  color: #f3f7fb;
   background:
     radial-gradient(circle at 50% 120%, rgba(22, 139, 255, 0.35), transparent 42%),
     linear-gradient(#07111f, #050b18);
+}
+
+/* El tema global claro no debe volver ilegibles las pantallas inmersivas de juego. */
+[data-tema='claro'] .ingreso-partida,
+[data-tema='claro'] .sala-espera,
+[data-tema='claro'] .partida.escenario,
+[data-tema='claro'] .aplicacion.en-juego .contenido {
+  color: #f3f7fb;
+}
+[data-tema='claro'] .ingreso-marca strong,
+[data-tema='claro'] .ingreso-tarjeta h1,
+[data-tema='claro'] .lobby-estudiante h1,
+[data-tema='claro'] .pregunta-estudiante h1,
+[data-tema='claro'] .pregunta-docente h1,
+[data-tema='claro'] .pregunta-docente h2 {
+  color: #f8fafc;
 }
 
 .ingreso-tarjeta,
@@ -54,7 +73,12 @@
   height: 36px;
   flex: 0 0 36px;
 }
-.ingreso-marca strong { font-size: 1.05rem; white-space: nowrap; }
+.ingreso-marca strong { font-size: 1.05rem; white-space: nowrap; color: #f8fafc; }
+.ingreso-tarjeta h1,
+.lobby-estudiante h1,
+.pregunta-estudiante h1 {
+  color: #f8fafc;
+}
 
 .ingreso-pasos {
   display: flex;
@@ -439,6 +463,17 @@
   padding: 8px 10px;
   border-radius: 14px;
   background: #102344;
+  min-width: 0;
+}
+.clasificacion-completa li strong,
+.puesto-juego strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.clasificacion-completa li > span:last-child {
+  justify-self: end;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .puesto-juego.lugar-1 { border: 1px solid #ffb800; }
@@ -476,15 +511,22 @@
   gap: 18px;
   width: min(920px, 100%);
   margin-inline: auto;
-  padding: 8px 0 28px;
+  padding: 4px 0 28px;
 }
-.final-encabezado { text-align: center; }
+.final-encabezado {
+  width: min(100%, 36rem);
+  text-align: center;
+  display: grid;
+  gap: 4px;
+}
 .final-encabezado h1 {
-  margin: 6px 0 0;
-  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  margin: 0;
+  font-size: clamp(1.55rem, 5vw, 2.6rem);
   letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
 }
-.final-encabezado p { margin: 6px 0 0; color: #a9bbd5; }
+.final-encabezado p { margin: 0; color: #a9bbd5; }
 .trofeo {
   width: 72px;
   height: 72px;
@@ -539,9 +581,25 @@
 }
 .podio-n2 .podio-puesto.lugar-2 { grid-column: 1; }
 .podio-n2 .podio-puesto.lugar-1 { grid-column: 2; }
-.podio-persona { display: grid; justify-items: center; gap: 4px; }
-.podio-persona strong { font-size: 1.05rem; }
-.podio-persona span { color: #a9bbd5; font-size: 0.92rem; }
+.podio-persona {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+.podio-persona strong {
+  font-size: 1.05rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.podio-persona span {
+  color: #a9bbd5;
+  font-size: 0.92rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
 .podio-base {
   width: 100%;
   display: grid;
@@ -597,16 +655,34 @@
   .podio-puesto.lugar-2 .podio-base { height: 82px; }
   .podio-puesto.lugar-3 .podio-base { height: 64px; }
   .podio-puesto.lugar-1 .avatar-juego { width: 72px; height: 72px; }
-  .podio-persona span { font-size: 0.75rem; }
+  .podio-puesto.lugar-2 .avatar-juego,
+  .podio-puesto.lugar-3 .avatar-juego { width: 56px; height: 56px; }
+  .podio-persona strong { font-size: 0.92rem; }
+  .podio-persona span { font-size: 0.72rem; line-height: 1.25; }
   .final-acciones { width: 100%; }
   .final-acciones .boton,
   .final-acciones .boton-fantasma { flex: 1 1 100%; }
+  .clasificacion-completa li {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+  .clasificacion-completa li > span:last-child {
+    grid-column: 2 / -1;
+  }
 }
 
 @media (max-width: 520px) {
   .rejilla-avatares { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .casillas-codigo { gap: 6px; }
+  .casillas-codigo { gap: 6px; max-width: 100%; flex-wrap: nowrap; }
+  .casilla-codigo { width: min(42px, 14vw); height: 50px; font-size: 1.15rem; flex: 0 0 auto; }
+  .ingreso-tarjeta { padding: 18px 14px; width: min(560px, 100%); }
+  .ingreso-partida { padding: 16px 10px 32px; }
   .puesto-juego { grid-template-columns: auto minmax(0, 1fr) auto; }
+}
+@media (max-width: 360px) {
+  .casillas-codigo { gap: 4px; }
+  .casilla-codigo { width: 40px; height: 48px; font-size: 1.05rem; }
+  .ingreso-pasos { gap: 8px; font-size: 0.75rem; flex-wrap: wrap; }
 }
 
 .escenario-partida {
@@ -630,9 +706,19 @@
 
 .escenario-barra {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  gap: 12px 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.escenario-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  min-width: 0;
 }
 
 .escenario-fase,
@@ -640,12 +726,16 @@
   margin: 0;
   font-weight: 800;
   letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
 }
+
+.escenario-etiqueta { color: #a9bbd5; font-weight: 700; }
 
 .escenario-progreso {
   display: flex;
   gap: 6px;
   min-width: 0;
+  grid-column: 1 / -1;
 }
 
 .escenario-progreso span {
@@ -663,20 +753,70 @@
 .escenario-pie {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   justify-content: flex-end;
+  min-width: 0;
+  max-width: 100%;
 }
 
+.escenario-utiles {
+  justify-self: end;
+}
+
+.escenario-utiles .audio-controles {
+  margin-left: 0;
+  max-width: 100%;
+}
+.audio-controles.abierto {
+  flex-basis: 100%;
+  justify-content: flex-start;
+}
+.audio-icono {
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.audio-icono-off { opacity: 0.45; }
+.audio-sliders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  width: 100%;
+  align-items: center;
+}
+.audio-texto-corto { display: none; }
+.audio-texto-largo { display: inline; }
+
 .escenario-pie .boton,
-.escenario-utiles .boton-fantasma { min-height: 48px; }
+.escenario-utiles .boton-fantasma { min-height: 44px; }
 
 .escenario-cuerpo {
   display: grid;
-  align-content: center;
+  align-content: start;
+  justify-items: stretch;
   gap: 16px;
   width: min(1100px, 100%);
   margin-inline: auto;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.escenario-partida.en-podio .escenario-cuerpo {
+  align-content: start;
+}
+
+.escenario-partida.en-podio .escenario-barra {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.escenario-partida.en-podio .escenario-utiles {
+  justify-self: stretch;
+  justify-content: flex-start;
 }
 
 .pregunta-inmersiva {
@@ -748,16 +888,55 @@
   font-size: clamp(1.15rem, 2vw, 1.6rem);
   font-weight: 800;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  transition: transform 0.12s ease, filter 0.2s ease, box-shadow 0.2s ease;
 }
 
 .escenario-partida .respuesta .simbolo { font-size: 1.3rem; }
 
-.escenario-partida .temporizador-fila { gap: 16px; }
+.escenario-partida .temporizador-fila { gap: 16px; align-items: center; }
 .escenario-partida .temporizador { height: 16px; }
 .escenario-partida .tiempo-restante {
   min-width: 4.2rem;
   font-size: clamp(1.6rem, 3vw, 2.6rem);
   font-weight: 800;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.tiempo-unidad { font-size: 0.45em; opacity: 0.75; margin-left: 2px; }
+
+.temporizador-fila.urgente .tiempo-restante {
+  color: #f5a524;
+  animation: latido 0.85s ease-in-out infinite;
+}
+.temporizador-fila.critico {
+  animation: temblor-suave 0.35s ease-in-out infinite;
+}
+.temporizador-fila.critico .temporizador span {
+  background: linear-gradient(90deg, #f5a524, #ff7a18, #f07178);
+}
+.temporizador-fila.critico .tiempo-restante {
+  color: #ff5a6a;
+  text-shadow: 0 0 18px rgba(255, 90, 106, 0.45);
+  animation: latido 0.45s ease-in-out infinite;
+}
+.temporizador-fila.critico[data-segundos='1'] .tiempo-restante {
+  color: #ff3355;
+  animation: latido 0.28s ease-in-out infinite;
+}
+
+.escenario-cuerpo.entra-pregunta {
+  animation: entrar-pregunta 0.42s ease;
+}
+
+.escenario-partida .respuesta:not(:disabled):active {
+  transform: scale(0.97);
+}
+.escenario-partida .respuesta.elegida {
+  filter: brightness(1.12);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55), 0 12px 28px rgba(0, 0, 0, 0.28);
+  animation: respuesta-pulse 0.45s ease;
 }
 
 .contador-respuestas,
@@ -800,10 +979,62 @@
 }
 
 .feedback-pantalla.bien { background: rgba(0, 214, 143, 0.16); color: #b9ffe4; animation: entrar-pregunta 0.35s ease; }
+.feedback-pantalla.bien.racha { box-shadow: 0 0 0 1px rgba(255, 184, 0, 0.45), 0 18px 40px rgba(255, 184, 0, 0.18); }
 .feedback-pantalla.mal { background: rgba(255, 56, 100, 0.16); color: #ffd0db; animation: sacudida 0.45s ease; }
 .feedback-pantalla.tiempo { background: rgba(22, 139, 255, 0.16); color: #d7e8ff; }
 .feedback-icono { font-size: clamp(3rem, 8vw, 5rem); line-height: 1; }
+.feedback-check {
+  display: grid;
+  place-items: center;
+  width: 1.15em;
+  height: 1.15em;
+  border-radius: 50%;
+  background: rgba(0, 214, 143, 0.28);
+  box-shadow: 0 0 0 8px rgba(0, 214, 143, 0.12);
+  animation: check-rebote 0.55s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.feedback-x { animation: sacudida 0.5s ease; }
 .feedback-puntos { margin: 0; font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; }
+.feedback-puntos-pop { animation: puntos-pop 0.55s ease; }
+.feedback-racha {
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 184, 0, 0.2);
+  color: #ffe4a3;
+  font-weight: 700;
+}
+
+.podio-puesto.oculto {
+  opacity: 0;
+  transform: translateY(28px) scale(0.92);
+  pointer-events: none;
+}
+.podio-puesto.revelado {
+  opacity: 1;
+  animation: podio-sube-premio 0.7s cubic-bezier(0.2, 1.2, 0.3, 1) both;
+}
+.podio-corona {
+  display: grid;
+  place-items: center;
+  color: #ffb800;
+  filter: drop-shadow(0 4px 10px rgba(255, 184, 0, 0.55));
+  animation: corona-brillo 1.4s ease-in-out infinite;
+}
+.podio-puesto.lugar-1.revelado .podio-persona {
+  position: relative;
+}
+.podio-tu-resultado {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(22, 139, 255, 0.16);
+  border: 1px solid rgba(22, 139, 255, 0.35);
+  text-align: center;
+}
+.podio-tu-resultado p { margin: 0; }
 
 .grafica-grupo,
 .clasificacion-pantalla {
@@ -949,10 +1180,56 @@
   60% { transform: translateX(-3px); }
   80% { transform: translateX(3px); }
 }
+@keyframes temblor-suave {
+  25% { transform: translateX(-1px); }
+  75% { transform: translateX(1px); }
+}
+@keyframes check-rebote {
+  0% { transform: scale(0.4); opacity: 0; }
+  70% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes puntos-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes respuesta-pulse {
+  50% { transform: scale(1.02); }
+}
+@keyframes podio-sube-premio {
+  from { opacity: 0; transform: translateY(36px) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes corona-brillo {
+  50% { transform: translateY(-3px) scale(1.08); filter: drop-shadow(0 6px 16px rgba(255, 184, 0, 0.75)); }
+}
 
 @media (max-width: 800px) {
-  .escenario-barra { grid-template-columns: 1fr auto; }
-  .escenario-progreso { grid-column: 1 / -1; order: 3; }
+  .escenario-partida { padding: 12px 14px 16px; gap: 10px; }
+  .escenario-barra {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .escenario-utiles {
+    justify-self: stretch;
+    justify-content: flex-start;
+  }
+  .escenario-utiles .audio-controles {
+    flex: 1 1 100%;
+  }
+  .escenario-utiles .boton-fantasma {
+    flex: 1 1 auto;
+  }
+  .escenario-utiles .volumen {
+    flex: 1 1 140px;
+  }
+  .escenario-utiles .volumen input {
+    width: 100%;
+    max-width: none;
+  }
+  .audio-texto-largo { display: none; }
+  .audio-texto-corto { display: inline; }
   .pregunta-inmersiva .respuestas,
   .grafica-resumen { grid-template-columns: 1fr; }
   .clasificacion-pantalla .puesto-juego { grid-template-columns: auto minmax(0, 1fr) auto; }
@@ -966,9 +1243,16 @@
   .avatar-opcion:hover,
   .avatar-opcion.elegido,
   .podio-puesto,
+  .podio-puesto.revelado,
   .pregunta-inmersiva,
   .feedback-pantalla,
+  .feedback-check,
+  .feedback-puntos-pop,
   .grafica-columna span,
   .espera-pulso,
-  .temporizador-fila.critico .tiempo-restante { transform: none; animation: none; }
+  .escenario-cuerpo.entra-pregunta,
+  .temporizador-fila.critico,
+  .temporizador-fila.urgente .tiempo-restante,
+  .temporizador-fila.critico .tiempo-restante,
+  .podio-corona { transform: none; animation: none; }
 }

@@ -6,7 +6,9 @@ import { VerificadorIdentidad } from '../src/autenticacion/verificador-identidad
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SalaPublica } from '../src/sesiones-juego/presentacion-sala';
-import { cuestionarioValido, SesionMemoria } from './sesion-memoria';
+import { cuestionarioValido, esperarApertura, SesionMemoria } from './sesion-memoria';
+
+jest.setTimeout(15_000);
 
 function comoSala(cuerpo: unknown): SalaPublica {
   return cuerpo as SalaPublica;
@@ -160,6 +162,7 @@ describe('Sesiones de juego (e2e)', () => {
       .expect(409)
       .expect({ mensaje: 'La partida ya fue iniciada.' });
 
+    await esperarApertura(partida);
     const cerrada = await request(app.getHttpServer())
       .post(`/sesiones-juego/${codigo}/cerrar`)
       .set('Authorization', 'Bearer token-ana')

@@ -5,7 +5,11 @@ import { crearAutenticacionHttp, crearAutenticacionSimulada } from './autenticac
 import { crearSalaHttp, crearSalaSimulada } from './sala.ts';
 export function crearServicios(opciones) {
     const entorno = opciones?.entorno ?? leerEntorno();
-    const usarSimulacion = opciones?.almacen !== undefined || entorno.simulacion || !entorno.authUrl || !entorno.actividadesUrl;
+    const modoPrueba = opciones?.almacen !== undefined;
+    const apisListas = Boolean(entorno.authUrl && entorno.actividadesUrl);
+    // Si hay API configurada, se usa siempre (auth, actividades y canal en vivo).
+    // Simulación solo en pruebas unitarias o cuando faltan las URLs.
+    const usarSimulacion = modoPrueba || !apisListas;
     if (usarSimulacion) {
         const almacen = opciones?.almacen ?? almacenLocal();
         const autenticacion = crearAutenticacionSimulada(almacen);

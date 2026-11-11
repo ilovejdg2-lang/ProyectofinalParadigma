@@ -79,7 +79,7 @@ export function ResultadoEvaluacion() {
             Exportar CSV
           </button>
         ) : null}
-        <Link className="boton" to={`/resultados/${dato.codigo}`}>Ver podio</Link>
+        <Link className="boton" to={`/resultados/${dato.codigo}`}>Ver podio y detalle</Link>
         <Link className="boton-fantasma" to="/cursos/paradigmas/calificaciones">Volver al curso</Link>
       </div>
       <p className="meta">El aporte son puntos de la nota final del curso. La posición es la del podio, no la de la nota.</p>

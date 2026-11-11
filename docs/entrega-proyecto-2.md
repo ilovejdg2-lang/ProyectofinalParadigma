@@ -21,6 +21,7 @@ Trabajo hecho el 2026-11-09 sobre la rama `entrega/proyecto-2-rubrica`, creada d
 | Entregable | Estado |
 | --- | --- |
 | Diagrama de arquitectura | Ya estaba en `docs/entrega-persona-5.md`. No se duplicó. |
+| Justificación N-Capas / Vertical Slice | `docs/decisiones/arquitectura-interna.md`: estilo del sistema, slices de actividades, N-Capas de autenticación, mapa para la defensa. |
 | Diagrama de clases | Agregado en `docs/diagramas/clases.md`. Separa autenticación y actividades. |
 | Modelo de datos | Agregado en `docs/diagramas/modelo-datos.md`, con los esquemas `auth_service` y `public`. |
 | OpenSpec archivado | `openspec/changes/archive/2026-11-09-frontend-evaluaciones-en-vivo/`. Las specs vigentes quedaron en `openspec/specs/`. |

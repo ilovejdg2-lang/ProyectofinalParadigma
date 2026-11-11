@@ -17,7 +17,7 @@ const etiquetasModo: Record<ModoJuego, string> = {
 
 export function DetalleCuestionario() {
   const { id = '' } = useParams()
-  const { actividades } = useServicios()
+  const { actividades, sala } = useServicios()
   const { token, perfil } = useAutenticacion()
   const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
   const navegar = useNavigate()

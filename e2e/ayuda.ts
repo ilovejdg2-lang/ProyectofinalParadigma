@@ -31,6 +31,10 @@ export async function entrar(pagina: Page, correo: string, contrasena = CLAVE) {
   await pagina.locator('input[type="password"]').fill(contrasena)
   await pagina.getByRole('button', { name: 'Iniciar Sesión' }).click()
   await expect(pagina).not.toHaveURL(/iniciar-sesion/)
+  if (new URL(pagina.url()).pathname === '/elegir') {
+    await pagina.getByRole('button', { name: /Cuestionarios/ }).click()
+    await expect(pagina).not.toHaveURL(/\/elegir$/)
+  }
   await expect(pagina.getByText('todavía se simulan en este navegador')).toHaveCount(0)
 }
 
