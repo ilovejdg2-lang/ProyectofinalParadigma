@@ -166,6 +166,8 @@ export interface ResumenResultado {
   finalizadaEn: string
   anfitrionId: string
   participantes: Participante[]
+  /** Preguntas de la partida (reveladas). Sirven para el detalle del docente. */
+  preguntas?: Pregunta[]
 }
 
 export interface EntradaGuardarPartida {

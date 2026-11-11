@@ -540,6 +540,7 @@ export function preguntasKanbanAcademicas(): Pregunta[] {
 }
 
 export function resultadosDemostracion(): ResumenResultado[] {
+  const porId = new Map(cuestionariosDemostracion().map((item) => [item.id, item]))
   return [
     {
       codigo: 'KANB01',
@@ -548,6 +549,7 @@ export function resultadosDemostracion(): ResumenResultado[] {
       modo: 'en-vivo',
       finalizadaEn: '2026-10-25T14:08:00.000Z',
       anfitrionId: ID_DEMO,
+      preguntas: porId.get('demo-kanban-fundamentos')?.preguntas,
       participantes: [
         {
           id: 'part-demo-kanb-doc',
@@ -590,6 +592,7 @@ export function resultadosDemostracion(): ResumenResultado[] {
       modo: 'evaluacion',
       finalizadaEn: '2026-10-26T16:06:00.000Z',
       anfitrionId: ID_DEMO,
+      preguntas: porId.get('demo-kanban-metricas')?.preguntas,
       participantes: [
         {
           id: 'part-demo-eval-est',

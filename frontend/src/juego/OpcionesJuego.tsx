@@ -1,5 +1,6 @@
 import { opcionesDe } from '../dominio/opciones.ts'
 import type { Pregunta } from '../dominio/tipos.ts'
+import { audio } from './audio.ts'
 
 const simbolos = ['▲', '◆', '●', '■']
 
@@ -53,7 +54,11 @@ export function OpcionesJuego({
             key={opcion.id}
             aria-label={opcion.texto}
             disabled={bloqueada}
-            onClick={() => onElegir(opcion.id)}
+            onClick={() => {
+              if (bloqueada || elegida) return
+              audio.efecto('enviado', `select-${opcion.id}`)
+              onElegir(opcion.id)
+            }}
           >
             {contenido}
           </button>

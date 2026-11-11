@@ -67,7 +67,8 @@ async function texto(respuesta: Response) {
 }
 
 export function cursosDisponibles() {
-  return Boolean(leerEntorno().actividadesUrl) && leerEntorno().simulacion === false
+  // Misma regla que crearServicios: si hay URL de API, se usa la API real.
+  return Boolean(leerEntorno().actividadesUrl && leerEntorno().authUrl)
 }
 
 export async function entrarAlCursoPredeterminado(token: string) {

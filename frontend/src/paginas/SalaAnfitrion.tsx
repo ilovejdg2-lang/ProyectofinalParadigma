@@ -60,10 +60,9 @@ export function SalaAnfitrion() {
     const anterior = fase.current
     fase.current = marcaFase
     if (!anterior) return
-    if (sala.estado === 'pregunta') audio.efecto('jugar')
-    if (sala.estado === 'cerrada') audio.efecto('clasificacion')
-    if (sala.estado === 'clasificacion') audio.efecto('clasificacion')
-    if (sala.estado === 'finalizada') audio.efecto('podio')
+    if (sala.estado === 'pregunta') audio.efecto('jugar', `host-jugar-${sala.preguntaActual}`)
+    if (sala.estado === 'cerrada') audio.efecto('clasificacion', `host-cierre-${sala.preguntaActual}`)
+    if (sala.estado === 'clasificacion') audio.efecto('clasificacion', `host-clasif-${sala.preguntaActual}`)
   }, [marcaFase, sala])
 
   async function accion(operacion: () => Promise<unknown>) {
@@ -141,7 +140,15 @@ export function SalaAnfitrion() {
         {pregunta && sala.estado === 'clasificacion' ? (
           <ClasificacionPantalla participantes={sala.participantes} preguntaId={pregunta.id} perfilId={perfil?.id} />
         ) : null}
-        {sala.estado === 'finalizada' ? <Podio participantes={sala.participantes} perfilId={perfil?.id} /> : null}
+        {sala.estado === 'finalizada' ? (
+          <section className="final-partida">
+            <header className="final-encabezado">
+              <p className="meta">Clasificación final</p>
+              <h1>{sala.titulo}</h1>
+            </header>
+            <Podio participantes={sala.participantes} perfilId={perfil?.id} />
+          </section>
+        ) : null}
       </EscenarioPartida>
     )
   }

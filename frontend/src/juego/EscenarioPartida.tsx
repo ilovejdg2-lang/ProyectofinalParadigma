@@ -23,25 +23,41 @@ export function EscenarioPartida({
   pie?: ReactNode
 }) {
   const ref = useRef<HTMLElement>(null)
+  const preguntaPrev = useRef<number | null>(null)
   const { activa, alternar } = usePantallaCompleta(ref)
 
   useEffect(() => {
-    audio.ambiente(paisaje, tension)
-  }, [paisaje, tension])
+    if (preguntaPrev.current === null) {
+      preguntaPrev.current = preguntaActual
+      return
+    }
+    if (preguntaPrev.current !== preguntaActual && fase === 'Pregunta') {
+      audio.efecto('transicion', `transicion-${preguntaActual}`)
+    }
+    preguntaPrev.current = preguntaActual
+  }, [preguntaActual, fase])
+
+  useEffect(() => () => audio.liberar(), [])
+
+  const enPodio = fase === 'Podio'
 
   return (
-    <section className="escenario-partida" ref={ref}>
+    <section className={`escenario-partida${enPodio ? ' en-podio' : ''}`} ref={ref}>
       <FondoJuego />
       <header className="escenario-barra">
-        <p className="escenario-fase">
-          Pregunta {Math.min(total, preguntaActual + 1)} de {total}
-        </p>
-        <div className="escenario-progreso" aria-hidden="true">
-          {Array.from({ length: total }, (_, indice) => (
-            <span className={indice < preguntaActual ? 'hecha' : indice === preguntaActual ? 'actual' : ''} key={indice} />
-          ))}
+        <div className="escenario-meta">
+          <p className="escenario-fase">
+            {enPodio ? 'Partida terminada' : `Pregunta ${Math.min(total, preguntaActual + 1)} de ${total}`}
+          </p>
+          {!enPodio ? <p className="escenario-etiqueta">{fase}</p> : null}
         </div>
-        <p className="escenario-etiqueta">{fase}</p>
+        {!enPodio ? (
+          <div className="escenario-progreso" aria-hidden="true">
+            {Array.from({ length: total }, (_, indice) => (
+              <span className={indice < preguntaActual ? 'hecha' : indice === preguntaActual ? 'actual' : ''} key={indice} />
+            ))}
+          </div>
+        ) : null}
         <div className="escenario-utiles">
           <ControlesAudio paisaje={paisaje} tension={tension} />
           <button className="boton-fantasma" type="button" onClick={() => void alternar()}>
@@ -49,7 +65,9 @@ export function EscenarioPartida({
           </button>
         </div>
       </header>
-      <div className="escenario-cuerpo">{children}</div>
+      <div className={`escenario-cuerpo${fase === 'Pregunta' ? ' entra-pregunta' : ''}`} key={`${fase}-${preguntaActual}`}>
+        {children}
+      </div>
       {pie ? <footer className="escenario-pie">{pie}</footer> : null}
     </section>
   )

@@ -22,10 +22,11 @@ function hostDeEstaRed(url: string): string {
 }
 
 export function leerEntorno(): Entorno {
-  return {
-    authUrl: hostDeEstaRed(import.meta.env.VITE_AUTH_URL ?? ''),
-    actividadesUrl: hostDeEstaRed(import.meta.env.VITE_ACTIVIDADES_URL ?? ''),
-    canalUrl: hostDeEstaRed(import.meta.env.VITE_CANAL_URL ?? ''),
-    simulacion: import.meta.env.VITE_USAR_SIMULACION !== 'false',
-  }
+  const authUrl = hostDeEstaRed(import.meta.env.VITE_AUTH_URL ?? '')
+  const actividadesUrl = hostDeEstaRed(import.meta.env.VITE_ACTIVIDADES_URL ?? '')
+  const canalUrl = hostDeEstaRed(import.meta.env.VITE_CANAL_URL ?? '')
+  const flag = import.meta.env.VITE_USAR_SIMULACION
+  // Opt-in: solo simula si se pide explícitamente. Si hay URLs de API, se usan.
+  const simulacion = flag === 'true'
+  return { authUrl, actividadesUrl, canalUrl, simulacion }
 }

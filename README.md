@@ -9,11 +9,13 @@ Plataforma universitaria de cuestionarios interactivos de verdadero o falso. La 
 - Una base PostgreSQL. En producción es Supabase y sus credenciales quedan en el servidor. En una máquina nueva, `scripts/iniciar.ps1` crea una base local sin esas credenciales.
 - Las cuentas de demostración se piden por el canal privado del equipo. Este repositorio no publica contraseñas.
 
-## Diagramas
+## Diagramas y arquitectura
 
+- [Estilo del sistema y organización interna (Vertical Slice / N-Capas)](docs/decisiones/arquitectura-interna.md)
 - [Arquitectura desplegada](docs/entrega-persona-5.md). Ya existía; no hay una segunda copia.
 - [Diagrama de clases](docs/diagramas/clases.md)
 - [Modelo de datos](docs/diagramas/modelo-datos.md)
+- [Decisiones de autenticación y tokens (ADR)](docs/decisiones/arquitectura.md)
 
 ## Módulos
 
@@ -146,4 +148,5 @@ Seguí [cliente-adicional/README.md](cliente-adicional/README.md). El ejemplo ab
 - [Spec archivado del frontend](openspec/changes/archive/2026-11-09-frontend-evaluaciones-en-vivo/)
 - [Autenticación](docs/auth.md)
 - [Eventos en vivo](docs/eventos-en-vivo.md)
-- [Decisiones de arquitectura](docs/decisiones/arquitectura.md)
+- [Organización interna Vertical Slice / N-Capas](docs/decisiones/arquitectura-interna.md)
+- [Decisiones de arquitectura (ADR)](docs/decisiones/arquitectura.md)

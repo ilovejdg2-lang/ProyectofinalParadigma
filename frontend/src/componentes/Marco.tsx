@@ -6,7 +6,7 @@ import { Buho } from './Buho.tsx'
 import { ReporteProblema } from './ReporteProblema.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
 import { useServicios } from '../contexto/ProveedorServicios.tsx'
-import { leerTema } from '../tema.ts'
+import { guardarTema, leerTema } from '../tema.ts'
 
 const curso = [
   { to: '/cursos/paradigmas', etiqueta: 'Vista General', detalle: 'Contenido del curso', fin: true, icono: 'libro' },
@@ -44,8 +44,7 @@ export function Marco() {
   const inicial = perfil?.nombre.slice(0, 1).toUpperCase() ?? 'M'
 
   useEffect(() => {
-    document.documentElement.dataset.tema = claro ? 'claro' : 'oscuro'
-    localStorage.setItem('profelink.tema', claro ? 'claro' : 'oscuro')
+    guardarTema(claro ? 'claro' : 'oscuro')
   }, [claro])
 
   useEffect(() => {
