@@ -16,10 +16,13 @@ chmod 644 ~/profelink/secrets/grafana_admin_password
 
 The file itself is readable by the Grafana container, while the host directory remains mode `700`. If the file is regenerated later, preserve those permissions.
 
-Copy the repository's production overlay into the fixed app configuration location used by the deploy service. Keep the source and remote copies in sync when changing Activities' OTLP environment:
+The candidate overlay is staged as `~/profelink/docker-compose.prod.observability.yml` so the existing home-directory copy is preserved. Back up the active configuration, then install the reviewed overlay into the fixed app configuration location used by the deploy service. Keep the source and remote copies in sync when changing Activities' OTLP environment:
 
 ```bash
-sudo install -m 644 ~/profelink/docker-compose.prod.yml /etc/profelink/docker-compose.prod.yml
+backup="/etc/profelink/docker-compose.prod.yml.before-observability.$(date -u +%Y%m%d%H%M%S)"
+sudo cp -a /etc/profelink/docker-compose.prod.yml "$backup" && \
+  sudo install -m 644 ~/profelink/docker-compose.prod.observability.yml /etc/profelink/docker-compose.prod.yml
+echo "Backup: $backup"
 ```
 
 Create the shared private network once, then start the separate observability project and recreate Activities so its SDK begins exporting spans. The network is external to both Compose projects and is not removed by either project going down:
