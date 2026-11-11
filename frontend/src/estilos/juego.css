@@ -721,6 +721,21 @@
   min-width: 0;
 }
 
+.escenario-codigo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(8, 16, 32, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.escenario-codigo span { font-weight: 700; }
+.escenario-codigo strong {
+  font-size: 1.35rem;
+  letter-spacing: 0.16em;
+}
 .escenario-fase,
 .escenario-etiqueta {
   margin: 0;

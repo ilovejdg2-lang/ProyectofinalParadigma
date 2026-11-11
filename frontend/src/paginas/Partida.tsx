@@ -80,7 +80,14 @@ export function Partida() {
   const enCuenta = cuentaActiva(sala, ahora)
   const restante = sala.cierraEn ? Math.max(0, new Date(sala.cierraEn).getTime() - ahora) : 0
   const tiempoAgotado = sala.estado === 'pregunta' && !enCuenta && sala.cierraEn !== null && restante === 0
-  const bloqueada = Boolean(respuesta) || sala.estado !== 'pregunta' || enviando || tiempoAgotado || enCuenta
+  const llegoTarde = Boolean(
+    participante &&
+      sala.estado === 'pregunta' &&
+      sala.elegibles &&
+      sala.elegibles.length > 0 &&
+      !sala.elegibles.includes(participante.id),
+  )
+  const bloqueada = Boolean(respuesta) || sala.estado !== 'pregunta' || enviando || tiempoAgotado || enCuenta || llegoTarde
   const academico = Boolean(sala.evaluacion) || sala.juego?.modalidad === 'academico'
   const paisaje = paisajeDe(sala, ahora, restante)
   const tension = paisaje === 'suspenso' && restante > 0 && restante <= 10_000
@@ -149,7 +156,13 @@ export function Partida() {
       ) : null}
       {pregunta && !enCuenta && sala.estado === 'pregunta' ? (
         <section className="pregunta-inmersiva">
-          {respuesta ? (
+          {llegoTarde ? (
+            <div className="espera-respuesta" role="status">
+              <h2>Entraste con la partida empezada</h2>
+              <p>Esta pregunta ya estaba abierta. Juegas desde la siguiente.</p>
+            </div>
+          ) : null}
+          {respuesta && !llegoTarde ? (
             <div className="espera-respuesta" role="status">
               <span className="espera-pulso" aria-hidden="true" />
               <h2>Respuesta enviada</h2>

@@ -204,9 +204,6 @@ export class SesionesJuegoService implements OnModuleDestroy {
       if (actual.estado === 'finalizada') {
         throw new ConflictException({ mensaje: 'Esta partida ya finalizó.' });
       }
-      if (!propio && actual.estado !== 'esperando') {
-        throw new ConflictException({ mensaje: 'La partida ya fue iniciada.' });
-      }
       const pedido = ficha?.nombre?.trim() ?? '';
       const nombre =
         pedido.length >= 2 && pedido.length <= 24 ? pedido : identidad.nombre;
