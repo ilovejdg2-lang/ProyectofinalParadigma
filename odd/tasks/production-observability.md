@@ -15,7 +15,7 @@ Acceptance: no external Grafana/OTLP exposure, service/resource state is checked
 
 ## Tasks
 - T1 (S1-S2) — Add production observability Compose/config and operational notes; inline; complete; commits `ac9a8fd` and `25fbb2a`.
-- T2 (S1-S2) — Deploy the config to the authorized Droplet and verify production traces; inline; complete; evidence commit pending.
+- T2 (S1-S2) — Deploy the config to the authorized Droplet and verify production traces; inline; complete; evidence commit `feef072`.
 
 ## Log
 - L1 User request verbatim: “siento que lo mejor es tenerlo en el droplet, ya que lo que queremos ver son las trazas de producción y el profe le dijo eso a un grupo”. Authorization: “lo autorizo, y no te preocupes no hay partidas activas ahorita”.
