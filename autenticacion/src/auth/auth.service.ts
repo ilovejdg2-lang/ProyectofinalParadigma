@@ -30,9 +30,10 @@ import {
   extraerEmailRegistro,
   extraerNombreRegistro,
   extraerPasswordRegistro,
+  extraerRolRegistro,
   RegistroDto,
 } from './dto/registro.dto';
-import { extraerEmail, extraerPassword, extraerRol, LoginDto } from './dto/login.dto';
+import { extraerEmail, extraerPassword, LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -91,11 +92,12 @@ export class AuthService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    const rolElegido = extraerRolRegistro(datos);
     const usuario = await this.almacen.crearUsuario({
       email,
       passwordHash,
       displayName: nombre,
-      role: resultadoPolitica.rol,
+      role: rolElegido ?? resultadoPolitica.rol,
       emailVerified: resultadoPolitica.emailVerificado,
       institutionId: resultadoPolitica.institutionId ?? null,
       status: resultadoPolitica.requiereVerificacion ? 'PendingVerification' : 'Active',
@@ -134,13 +136,7 @@ export class AuthService {
       throw new UnauthorizedException('La cuenta está bloqueada.');
     }
 
-    const rolPedido = extraerRol(datos);
-    let vigente = usuario;
-    if (rolPedido && usuario.role !== 'admin' && usuario.role !== rolPedido) {
-      vigente = await this.almacen.actualizarUsuario(usuario.id, { role: rolPedido });
-    }
-
-    return this.emitirTokens(vigente, ip);
+    return this.emitirTokens(usuario, ip);
   }
 
   async buscarPorCorreo(correo: string): Promise<PerfilPublico> {

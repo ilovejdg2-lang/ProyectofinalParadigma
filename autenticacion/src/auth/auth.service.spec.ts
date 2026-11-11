@@ -145,29 +145,6 @@ describe('AuthService & Dominio de Políticas de Correo', () => {
       expect(res.perfil.correo).toBe('profesor@una.cr');
     });
 
-    it('al iniciar sesión puede elegir ser estudiante o profesor', async () => {
-      const comoEstudiante = await authService.iniciarSesion({
-        correo: 'profesor@una.cr',
-        contrasena: 'Profesor123!',
-        rol: 'student',
-      } as any);
-      expect(comoEstudiante.perfil.rol).toBe('student');
-
-      const comoProfesor = await authService.iniciarSesion({
-        correo: 'profesor@una.cr',
-        contrasena: 'Profesor123!',
-        rol: 'teacher',
-      } as any);
-      expect(comoProfesor.perfil.rol).toBe('teacher');
-
-      const admin = await authService.iniciarSesion({
-        correo: 'admin@una.cr',
-        contrasena: 'Admin123!',
-        rol: 'student',
-      } as any);
-      expect(admin.perfil.rol).toBe('admin');
-    });
-
     it('inicia sesión con el estudiante demo sembrado', async () => {
       const res = await authService.iniciarSesion({
         correo: 'estudiante@est.una.ac.cr',
@@ -199,6 +176,24 @@ describe('AuthService & Dominio de Políticas de Correo', () => {
 
       expect(res.perfil.rol).toBe('teacher');
       expect(res.perfil.correo).toBe('maria.vargas@una.cr');
+    });
+
+    it('guarda el rol elegido al crear la cuenta', async () => {
+      const estudiante = await authService.registrar({
+        nombre: 'Luis Mora',
+        correo: 'luis.mora@una.cr',
+        contrasena: 'Segura1234!',
+        rol: 'student',
+      } as any);
+      expect(estudiante.perfil.rol).toBe('student');
+
+      const profesor = await authService.registrar({
+        nombre: 'Ana Solis',
+        correo: 'ana.solis@gmail.com',
+        contrasena: 'Segura1234!',
+        rol: 'teacher',
+      } as any);
+      expect(profesor.perfil.rol).toBe('teacher');
     });
   });
 

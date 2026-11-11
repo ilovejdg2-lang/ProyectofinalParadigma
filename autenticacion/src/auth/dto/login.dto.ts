@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsOptional, IsString } from 'class-validator';
 
 export class LoginDto {
   @IsOptional()
@@ -16,10 +16,6 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   password?: string;
-
-  @IsOptional()
-  @IsIn(['teacher', 'student'])
-  rol?: 'teacher' | 'student';
 }
 
 export function extraerEmail(datos: any): string {
@@ -34,10 +30,4 @@ export function extraerPassword(datos: any): string {
   const val = datos?.contrasena ?? datos?.password ?? '';
   if (!val) throw new Error('La contraseña es obligatoria.');
   return val;
-}
-
-export function extraerRol(datos: any): 'teacher' | 'student' | null {
-  const val = datos?.rol;
-  if (val === 'teacher' || val === 'student') return val;
-  return null;
 }

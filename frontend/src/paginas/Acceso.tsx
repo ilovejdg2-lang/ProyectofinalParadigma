@@ -60,14 +60,14 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     const validacion = validarAcceso({ nombre, correo, contrasena, registro })
-    if (!registro && !rol) validacion.push('Elige si entras como profesor o como estudiante.')
+    if (registro && !rol) validacion.push('Elige si la cuenta es de profesor o de estudiante.')
     setErrores(validacion)
     if (validacion.length > 0) return
     setEnviando(true)
     try {
       const sesion = registro
-        ? await autenticacion.registrar({ nombre, correo, contrasena })
-        : await autenticacion.iniciarSesion(correo, contrasena, rol || undefined)
+        ? await autenticacion.registrar({ nombre, correo, contrasena, rol: rol || undefined })
+        : await autenticacion.iniciarSesion(correo, contrasena)
       limpiarEspacio()
       entrar(sesion)
       navegar(esEntradaDirecta(destino) ? destino : '/elegir', { replace: true })
@@ -104,7 +104,7 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
                 ? `Crea tu cuenta para entrar a la partida ${codigoInvitacion}. No necesitas escribir el código.`
                 : `Inicia sesión para entrar a la partida ${codigoInvitacion}. No necesitas escribir el código.`
               : registro
-                ? 'Registra tu perfil para crear cuestionarios y jugar.'
+                ? 'Elige si la cuenta es de profesor o de estudiante. Eso no se cambia al entrar.'
                 : 'Inicia sesión para acceder a tu cuenta'}
           </p>
           {registro ? (
@@ -139,9 +139,9 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
               </button>
             </span>
           </label>
-          {registro ? null : (
+          {registro ? (
             <fieldset className="acceso-rol">
-              <legend>Entras como</legend>
+              <legend>La cuenta es de</legend>
               <div className="acceso-roles">
                 <button type="button" aria-pressed={rol === 'teacher'} onClick={() => setRol('teacher')}>
                   Profesor
