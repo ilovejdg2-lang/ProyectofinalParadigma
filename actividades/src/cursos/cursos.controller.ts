@@ -42,6 +42,11 @@ export class CursosController {
     return this.cursos.crear(identidad, entrada.nombre);
   }
 
+  @Get('cursos/:id/matriculas')
+  matriculas(@Param('id') id: string, @IdentidadActual() identidad: IdentidadExterna) {
+    return this.cursos.matriculas(identidad, id);
+  }
+
   @Post('cursos/predeterminado')
   entrarPredeterminado(@IdentidadActual() identidad: IdentidadExterna) {
     return this.cursos.entrarPredeterminado(identidad);

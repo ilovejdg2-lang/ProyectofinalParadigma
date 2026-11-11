@@ -36,11 +36,24 @@ export interface EvaluacionCurso {
   calificaciones: NotaEvaluacion[]
 }
 
-const CURSO_DEMO: CursoDocente = {
-  id: 'curso-paradigmas',
-  nombre: 'Paradigmas de Programación',
-  estudiantes: 1,
+export interface EstudianteCurso {
+  estudianteId: string
+  nombre: string
 }
+
+export interface PerfilAsignable {
+  id: string
+  nombre: string
+  correo: string
+}
+
+interface CursoLocal {
+  token: string
+  curso: CursoDocente
+  alumnos: EstudianteCurso[]
+}
+
+const cursosLocales: CursoLocal[] = []
 
 function raiz() {
   return leerEntorno().actividadesUrl.replace(/\/$/, '')
@@ -81,12 +94,53 @@ export async function entrarAlCursoPredeterminado(token: string) {
 }
 
 export async function listarCursos(token: string): Promise<CursoDocente[]> {
-  if (!cursosDisponibles()) return [CURSO_DEMO]
+  if (!cursosDisponibles()) return cursosLocales.filter((item) => item.token === token).map((item) => item.curso)
   return pedir(token, '/cursos')
 }
 
+export async function listarMatriculas(token: string, cursoId: string): Promise<EstudianteCurso[]> {
+  if (!cursosDisponibles()) {
+    return cursosLocales.find((item) => item.token === token && item.curso.id === cursoId)?.alumnos ?? []
+  }
+  return pedir(token, `/cursos/${cursoId}/matriculas`)
+}
+
+export async function asignarEstudiante(
+  token: string,
+  cursoId: string,
+  estudianteId: string,
+  nombre: string,
+): Promise<void> {
+  if (!cursosDisponibles()) {
+    const curso = cursosLocales.find((item) => item.token === token && item.curso.id === cursoId)
+    if (!curso) throw new ErrorServicio('permiso', 'Ese curso no está asignado a tu cuenta.')
+    if (!curso.alumnos.some((alumno) => alumno.estudianteId === estudianteId)) {
+      curso.alumnos.push({ estudianteId, nombre })
+      curso.curso.estudiantes = curso.alumnos.length
+    }
+    return
+  }
+  await pedir(token, `/cursos/${cursoId}/matriculas`, 'POST', { estudianteId, nombre })
+}
+
+export async function buscarEstudiante(token: string, correo: string): Promise<PerfilAsignable> {
+  const auth = leerEntorno().authUrl.replace(/\/$/, '')
+  const limpio = correo.trim().toLowerCase()
+  if (!auth) return { id: limpio, nombre: limpio.split('@')[0] || 'Estudiante', correo: limpio }
+  const respuesta = await fetch(`${auth}/perfiles/buscar?correo=${encodeURIComponent(correo.trim().toLowerCase())}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (respuesta.status === 404) throw new ErrorServicio('no-encontrado', 'No hay una cuenta con ese correo.')
+  if (!respuesta.ok) throw new ErrorServicio('permiso', await texto(respuesta))
+  return (await respuesta.json()) as PerfilAsignable
+}
+
 export async function crearCurso(token: string, nombre: string): Promise<CursoDocente> {
-  if (!cursosDisponibles()) return { id: 'curso-local', nombre, estudiantes: 0 }
+  if (!cursosDisponibles()) {
+    const curso = { id: crypto.randomUUID(), nombre, estudiantes: 0 }
+    cursosLocales.push({ token, curso, alumnos: [] })
+    return curso
+  }
   return pedir(token, '/cursos', 'POST', { nombre })
 }
 

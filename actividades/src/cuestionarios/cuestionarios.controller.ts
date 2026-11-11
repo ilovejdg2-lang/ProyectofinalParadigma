@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -32,18 +31,6 @@ import {
   FiltrosCatalogoDto,
 } from './dto/entrada-cuestionario.dto';
 import { CuestionarioResponseDto } from './dto/cuestionario-response.dto';
-
-function exigirDocente(identidad: IdentidadExterna) {
-  if (
-    identidad.role &&
-    identidad.role !== 'teacher' &&
-    identidad.role !== 'admin'
-  ) {
-    throw new ForbiddenException({
-      mensaje: 'Solo los docentes pueden gestionar cuestionarios.',
-    });
-  }
-}
 
 @Controller()
 @ApiTags('Cuestionarios')
@@ -120,7 +107,7 @@ export class CuestionariosController {
   @Post('cuestionarios')
   @ApiBearerAuth()
   @UseGuards(IdentidadGuard)
-  @ApiOperation({ summary: 'Crear un cuestionario (docente o administrador)' })
+  @ApiOperation({ summary: 'Crear un cuestionario' })
   @ApiCreatedResponse({
     description: 'Cuestionario creado.',
     type: CuestionarioResponseDto,
@@ -129,7 +116,6 @@ export class CuestionariosController {
     @Body() entrada: EntradaCuestionarioDto,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
-    exigirDocente(identidad);
     return this.cuestionarios.crear(entrada, identidad);
   }
 
@@ -137,7 +123,7 @@ export class CuestionariosController {
   @ApiBearerAuth()
   @UseGuards(IdentidadGuard)
   @ApiOperation({
-    summary: 'Actualizar un cuestionario propio (docente o administrador)',
+    summary: 'Actualizar un cuestionario propio',
   })
   @ApiParam({ name: 'id', description: 'Identificador del cuestionario.' })
   @ApiOkResponse({
@@ -149,7 +135,6 @@ export class CuestionariosController {
     @Body() entrada: EntradaCuestionarioDto,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
-    exigirDocente(identidad);
     return this.cuestionarios.actualizar(id, entrada, identidad);
   }
 
@@ -158,7 +143,7 @@ export class CuestionariosController {
   @ApiBearerAuth()
   @UseGuards(IdentidadGuard)
   @ApiOperation({
-    summary: 'Eliminar un cuestionario propio (docente o administrador)',
+    summary: 'Eliminar un cuestionario propio',
   })
   @ApiParam({ name: 'id', description: 'Identificador del cuestionario.' })
   @ApiNoContentResponse({ description: 'Cuestionario eliminado.' })
@@ -166,7 +151,6 @@ export class CuestionariosController {
     @Param('id') id: string,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
-    exigirDocente(identidad);
     return this.cuestionarios.eliminar(id, identidad);
   }
 }
