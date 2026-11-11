@@ -67,12 +67,7 @@ export function Marco() {
   const espacio = leerEspacio()
   const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
   const rolEtiqueta = perfil?.rol === 'admin' ? 'Administrador' : esDocente ? 'Docente' : 'Estudiante'
-  const enlaces = (espacio === 'cursos' ? curso : cuestionario).filter((enlace) => {
-    if (!esDocente && (enlace.to === '/mis-cuestionarios' || enlace.to === '/cuestionarios/nuevo')) {
-      return false
-    }
-    return true
-  })
+  const enlaces = espacio === 'cursos' ? curso : cuestionario
   const enlacesProgreso = espacio === 'cursos' ? progresoCurso : progreso
   const inicio = espacio === 'cursos' ? '/cursos' : '/'
 

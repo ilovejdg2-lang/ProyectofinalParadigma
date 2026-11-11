@@ -16,7 +16,7 @@ export interface SolicitudRecuperacion {
 
 export interface ClienteAutenticacion {
   registrar(datos: RegistroPerfil): Promise<Sesion>
-  iniciarSesion(correo: string, contrasena: string): Promise<Sesion>
+  iniciarSesion(correo: string, contrasena: string, rol?: 'teacher' | 'student'): Promise<Sesion>
   cerrarSesion(token: string): Promise<void>
   sesionActual(token: string): Promise<Sesion | null>
   cambiarContrasena(token: string, actual: string, nueva: string): Promise<void>
@@ -97,12 +97,13 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
       guardar(almacen, estado)
       return sesionDe(estado, token)!
     },
-    async iniciarSesion(correo, contrasena) {
+    async iniciarSesion(correo, contrasena, rol) {
       const estado = leer(almacen)
       const usuario = estado.usuarios.find((item) => item.correo === correo.trim().toLowerCase())
       if (!usuario || usuario.contrasena !== contrasena) {
         throw new ErrorServicio('credenciales', 'Correo o contraseña incorrectos.')
       }
+      if ((rol === 'teacher' || rol === 'student') && usuario.rol !== 'admin') usuario.rol = rol
       const token = crearId()
       estado.sesiones.push({ token, perfilId: usuario.id })
       guardar(almacen, estado)
@@ -208,13 +209,13 @@ export function crearAutenticacionHttp(baseUrl: string): ClienteAutenticacion {
       if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
       return (await respuesta.json()) as Sesion
     },
-    async iniciarSesion(correo, contrasena) {
+    async iniciarSesion(correo, contrasena, rol) {
       let respuesta: Response
       try {
         respuesta = await fetch(`${raiz}/sesiones`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ correo, contrasena }),
+          body: JSON.stringify({ correo, contrasena, ...(rol ? { rol } : {}) }),
         })
       } catch {
         throw new ErrorServicio('conexion', 'No se pudo conectar con el servicio de autenticación.')

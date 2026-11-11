@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Param,
   Post,
@@ -16,14 +15,6 @@ import { JugarMinijuegoDto } from './dto/jugar-minijuego.dto';
 import { ResponderDto } from './dto/responder.dto';
 import { SesionesJuegoService } from './sesiones-juego.service';
 
-function exigirDocente(identidad: IdentidadExterna) {
-  if (identidad.role && identidad.role !== 'teacher' && identidad.role !== 'admin') {
-    throw new ForbiddenException({
-      mensaje: 'Solo los docentes pueden crear salas de juego.',
-    });
-  }
-}
-
 @Controller()
 export class SesionesJuegoController {
   constructor(private readonly sesiones: SesionesJuegoService) {}
@@ -34,7 +25,6 @@ export class SesionesJuegoController {
     @Body() entrada: CrearSesionDto,
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
-    exigirDocente(identidad);
     return this.sesiones.crear(entrada.cuestionarioId, identidad, {
       modo: entrada.modo,
       cursoId: entrada.cursoId,

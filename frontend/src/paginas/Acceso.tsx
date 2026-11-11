@@ -39,6 +39,7 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
   const [correo, setCorreo] = useState('')
   const [contrasena, setContrasena] = useState('')
   const [verContrasena, setVerContrasena] = useState(false)
+  const [rol, setRol] = useState<'teacher' | 'student' | ''>('')
   const [errores, setErrores] = useState<string[]>([])
   const [enviando, setEnviando] = useState(false)
   const [recuperar, setRecuperar] = useState(false)
@@ -59,13 +60,14 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     const validacion = validarAcceso({ nombre, correo, contrasena, registro })
+    if (!registro && !rol) validacion.push('Elige si entras como profesor o como estudiante.')
     setErrores(validacion)
     if (validacion.length > 0) return
     setEnviando(true)
     try {
       const sesion = registro
         ? await autenticacion.registrar({ nombre, correo, contrasena })
-        : await autenticacion.iniciarSesion(correo, contrasena)
+        : await autenticacion.iniciarSesion(correo, contrasena, rol || undefined)
       limpiarEspacio()
       entrar(sesion)
       navegar(esEntradaDirecta(destino) ? destino : '/elegir', { replace: true })
@@ -137,6 +139,19 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
               </button>
             </span>
           </label>
+          {registro ? null : (
+            <fieldset className="acceso-rol">
+              <legend>Entras como</legend>
+              <div className="acceso-roles">
+                <button type="button" aria-pressed={rol === 'teacher'} onClick={() => setRol('teacher')}>
+                  Profesor
+                </button>
+                <button type="button" aria-pressed={rol === 'student'} onClick={() => setRol('student')}>
+                  Estudiante
+                </button>
+              </div>
+            </fieldset>
+          )}
           {errores.length > 0 ? (
             <ul className="lista-errores acceso-errores">
               {errores.map((error) => (

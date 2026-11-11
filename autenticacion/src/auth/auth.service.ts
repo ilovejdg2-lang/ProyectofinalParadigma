@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -31,7 +32,7 @@ import {
   extraerPasswordRegistro,
   RegistroDto,
 } from './dto/registro.dto';
-import { extraerEmail, extraerPassword, LoginDto } from './dto/login.dto';
+import { extraerEmail, extraerPassword, extraerRol, LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -133,7 +134,25 @@ export class AuthService {
       throw new UnauthorizedException('La cuenta está bloqueada.');
     }
 
-    return this.emitirTokens(usuario, ip);
+    const rolPedido = extraerRol(datos);
+    let vigente = usuario;
+    if (rolPedido && usuario.role !== 'admin' && usuario.role !== rolPedido) {
+      vigente = await this.almacen.actualizarUsuario(usuario.id, { role: rolPedido });
+    }
+
+    return this.emitirTokens(vigente, ip);
+  }
+
+  async buscarPorCorreo(correo: string): Promise<PerfilPublico> {
+    const email = correo.trim().toLowerCase();
+    if (!email.includes('@')) {
+      throw new BadRequestException({ mensaje: 'Escribe un correo válido.' });
+    }
+    const usuario = await this.almacen.buscarPorEmail(email);
+    if (!usuario) {
+      throw new NotFoundException({ mensaje: 'No hay una cuenta con ese correo.' });
+    }
+    return this.formatearPerfil(usuario);
   }
 
   async refrescar(datos: RefreshDto, ip?: string): Promise<TokensRespuesta> {

@@ -15,7 +15,8 @@ type Modo = 'practica' | 'evaluacion'
 export function ConfigurarSesion() {
   const { id = '' } = useParams()
   const { actividades, sala } = useServicios()
-  const { token } = useAutenticacion()
+  const { token, perfil } = useAutenticacion()
+  const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
   const navegar = useNavigate()
   const [cuestionario, setCuestionario] = useState<Cuestionario | null>(null)
   const [cursos, setCursos] = useState<CursoDocente[]>([])
@@ -81,26 +82,27 @@ export function ConfigurarSesion() {
       setError('El cuestionario no tiene preguntas evaluables.')
       return
     }
-    if (modo === 'evaluacion' && !cursoId) {
+    if (esDocente && modo === 'evaluacion' && !cursoId) {
       setError('Elige el curso de la evaluación.')
       return
     }
-    if (modo === 'evaluacion' && (notaMaxima < 1 || valor < 1 || valor > 100 || notaMinima > notaMaxima)) {
+    if (esDocente && modo === 'evaluacion' && (notaMaxima < 1 || valor < 1 || valor > 100 || notaMinima > notaMaxima)) {
       setError('Revisa la nota máxima, el porcentaje y la nota mínima.')
       return
     }
+    const modoSala = esDocente ? modo : 'practica'
     const config: ConfiguracionSala = {
-      modo,
-      cursoId: cursoId || undefined,
-      nombreEvaluacion: modo === 'evaluacion' ? nombre.trim() || cuestionario.titulo : undefined,
+      modo: modoSala,
+      cursoId: esDocente && modoSala === 'evaluacion' ? cursoId || undefined : undefined,
+      nombreEvaluacion: modoSala === 'evaluacion' ? nombre.trim() || cuestionario.titulo : undefined,
       notaMaxima,
-      valorPorcentaje: modo === 'evaluacion' ? valor : undefined,
+      valorPorcentaje: modoSala === 'evaluacion' ? valor : undefined,
       notaMinima,
-      modalidad: modo === 'evaluacion' ? 'academico' : 'competitivo',
+      modalidad: modoSala === 'evaluacion' ? 'academico' : 'competitivo',
       minijuegosActivos: minijuegos,
       cadaPreguntas: cada,
       duracionMinijuego: duracion,
-      velocidadActiva: modo === 'evaluacion' ? false : velocidad,
+      velocidadActiva: modoSala === 'evaluacion' ? false : velocidad,
       tiposMinijuego: ['cofres', 'ruleta', 'estrellas', 'memoria', 'bomba'],
     }
     const ventana = prepararPestanaSala()
@@ -132,46 +134,57 @@ export function ConfigurarSesion() {
       <header className="configurar-cabeza">
         <div>
           <h1>Configurar sesión</h1>
-          <p>Personaliza cómo quieres realizar este cuestionario con tus estudiantes.</p>
+          <p>
+            {esDocente
+              ? 'Personaliza cómo quieres realizar este cuestionario con tus estudiantes.'
+              : 'Esta partida es solo un juego. No cuenta en ningún curso ni genera nota.'}
+          </p>
         </div>
         <p className="meta">{cuestionario.titulo}</p>
       </header>
 
-      <div className="configurar-modos">
-        <button type="button" className={modo === 'practica' ? 'modo-sesion activo' : 'modo-sesion'} aria-pressed={modo === 'practica'} onClick={() => setModo('practica')}>
-          <Gamepad2 aria-hidden="true" />
-          <strong>Partida de práctica</strong>
-          <span>Juega con tus estudiantes sin generar una calificación académica.</span>
-          {modo === 'practica' ? <CheckCircle2 className="modo-marca" aria-hidden="true" /> : null}
-        </button>
-        <button type="button" className={modo === 'evaluacion' ? 'modo-sesion activo evaluacion' : 'modo-sesion'} aria-pressed={modo === 'evaluacion'} onClick={() => { setModo('evaluacion'); setCursoId((actual) => actual || cursos[0]?.id || '') }}>
-          <GraduationCap aria-hidden="true" />
-          <strong>Evaluación calificada</strong>
-          <span>Asigna el cuestionario a un curso y califica automáticamente a tus estudiantes.</span>
-          {modo === 'evaluacion' ? <CheckCircle2 className="modo-marca" aria-hidden="true" /> : null}
-        </button>
-      </div>
+      {esDocente ? (
+        <div className="configurar-modos">
+          <button type="button" className={modo === 'practica' ? 'modo-sesion activo' : 'modo-sesion'} aria-pressed={modo === 'practica'} onClick={() => setModo('practica')}>
+            <Gamepad2 aria-hidden="true" />
+            <strong>Partida de juego</strong>
+            <span>Juega sin generar una calificación. Puede entrar cualquiera con el código.</span>
+            {modo === 'practica' ? <CheckCircle2 className="modo-marca" aria-hidden="true" /> : null}
+          </button>
+          <button type="button" className={modo === 'evaluacion' ? 'modo-sesion activo evaluacion' : 'modo-sesion'} aria-pressed={modo === 'evaluacion'} onClick={() => { setModo('evaluacion'); setCursoId((actual) => actual || cursos[0]?.id || '') }}>
+            <GraduationCap aria-hidden="true" />
+            <strong>Evaluación calificada</strong>
+            <span>Asigna el cuestionario a uno de tus cursos y califica a esos estudiantes.</span>
+            {modo === 'evaluacion' ? <CheckCircle2 className="modo-marca" aria-hidden="true" /> : null}
+          </button>
+        </div>
+      ) : (
+        <p className="configurar-ayuda">Como estudiante, la sala queda en modo juego aunque el cuestionario exista en un curso.</p>
+      )}
 
-      <label className="configurar-campo">
-        Curso
-        <select value={cursoId} onChange={(evento) => setCursoId(evento.target.value)}>
-          {modo === 'practica' ? <option value="">Sin curso</option> : null}
-          {cursos.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.id === 'curso-paradigmas' ? `${item.nombre} · todas las cuentas` : item.nombre}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="configurar-ayuda">
-        La nota queda ligada al curso. Solo entra quien pertenece a ese curso. Paradigmas de Programación recibe a cualquier persona que cree una cuenta.
-      </p>
-      <div className="configurar-nuevo-curso">
-        <input value={cursoNuevo} onChange={(evento) => setCursoNuevo(evento.target.value)} placeholder="Nuevo curso" maxLength={80} aria-label="Nombre del curso nuevo" />
-        <button className="boton" type="button" onClick={() => void agregarCurso()}>
-          Crear curso
-        </button>
-      </div>
+      {esDocente && modo === 'evaluacion' ? (
+        <>
+          <label className="configurar-campo">
+            Curso
+            <select value={cursoId} onChange={(evento) => setCursoId(evento.target.value)}>
+              {cursos.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="configurar-ayuda">
+            Solo entran los estudiantes asignados a este curso. Quien esté en otro curso no puede unirse a la evaluación.
+          </p>
+          <div className="configurar-nuevo-curso">
+            <input value={cursoNuevo} onChange={(evento) => setCursoNuevo(evento.target.value)} placeholder="Nuevo curso" maxLength={80} aria-label="Nombre del curso nuevo" />
+            <button className="boton" type="button" onClick={() => void agregarCurso()}>
+              Crear curso
+            </button>
+          </div>
+        </>
+      ) : null}
 
       {modo === 'evaluacion' ? (
         <section className="configurar-notas" aria-labelledby="titulo-nota">
@@ -245,10 +258,10 @@ export function ConfigurarSesion() {
         <h2>Opciones de la sesión</h2>
         <ul>
           <li>Cuestionario: {cuestionario.titulo}</li>
-          <li>Tipo: {modo === 'evaluacion' ? 'Evaluación académica' : 'Competencia'}</li>
+          <li>Tipo: {esDocente && modo === 'evaluacion' ? 'Evaluación académica' : 'Juego'}</li>
           <li>Minijuegos: {minijuegos ? `sí, cada ${cada} preguntas` : 'no'}</li>
           {modo === 'practica' ? <li>Velocidad: {velocidad ? 'suma puntos extra' : 'desactivada'}</li> : <li>Velocidad: no afecta la nota</li>}
-          <li>Curso: {curso?.nombre ?? 'Ninguno'}</li>
+          <li>Curso: {esDocente && modo === 'evaluacion' ? curso?.nombre ?? 'Ninguno' : 'No cuenta'}</li>
           <li>Preguntas: {preguntas}</li>
           <li>Tiempo: el de cada pregunta, o 20 segundos</li>
           {modo === 'evaluacion' ? <li>Valor académico: {valor}% de la nota, sobre {notaMaxima}</li> : null}

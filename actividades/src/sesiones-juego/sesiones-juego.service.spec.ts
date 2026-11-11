@@ -571,7 +571,7 @@ describe('SesionesJuegoService', () => {
     expect(ajeno).toBeInstanceOf(ForbiddenException);
   });
 
-  it('matricula en el curso por defecto a quien entra con su cuenta', async () => {
+  it('no deja entrar a una evaluación del curso por defecto sin estar asignado', async () => {
     const { servicio, memoria } = armar();
     memoria.cursos.push({
       id: 'curso-paradigmas',
@@ -583,20 +583,49 @@ describe('SesionesJuegoService', () => {
       cursoId: 'curso-paradigmas',
       valorPorcentaje: 10,
     });
-    await expect(servicio.unirse(sala.codigo, { id: 'nueva', nombre: 'Nueva' })).resolves.toMatchObject({
-      codigo: sala.codigo,
-    });
-    expect(memoria.matriculas).toEqual(
-      expect.arrayContaining([{ cursoId: 'curso-paradigmas', estudianteId: 'nueva' }]),
-    );
+    const ajeno = await rechazo(servicio.unirse(sala.codigo, { id: 'nueva', nombre: 'Nueva' }));
+    expect(ajeno).toBeInstanceOf(ForbiddenException);
+    expect(memoria.matriculas).toEqual([]);
   });
 
-  it('no deja entrar a una partida del curso a quien no está matriculado', async () => {
+  it('no deja que un estudiante de otro curso entre a una evaluación', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({ id: 'curso-1', nombre: 'Paradigmas', docenteId: 'ana' });
+    memoria.cursos.push({ id: 'curso-2', nombre: 'Bases', docenteId: 'otro' });
+    memoria.matriculas.push({ cursoId: 'curso-1', estudianteId: 'luis' });
+    memoria.matriculas.push({ cursoId: 'curso-2', estudianteId: 'nora' });
+    const sala = await servicio.crear('quiz-1', ana, {
+      modo: 'evaluacion',
+      cursoId: 'curso-1',
+      valorPorcentaje: 10,
+    });
+    await expect(servicio.unirse(sala.codigo, luis)).resolves.toMatchObject({ codigo: sala.codigo });
+    const ajeno = await rechazo(servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' }));
+    expect(ajeno).toBeInstanceOf(ForbiddenException);
+    expect(ajeno.getResponse().mensaje).toMatch(/otro curso/);
+  });
+
+  it('deja entrar a una partida de juego aunque no esté matriculado', async () => {
     const { servicio, memoria } = armar();
     memoria.cursos.push({ id: 'curso-1', nombre: 'Paradigmas', docenteId: 'ana' });
     const sala = await servicio.crear('quiz-1', ana, { modo: 'practica', cursoId: 'curso-1' });
-    const ajeno = await rechazo(servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' }));
-    expect(ajeno).toBeInstanceOf(ForbiddenException);
+    await expect(servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' })).resolves.toMatchObject({
+      codigo: sala.codigo,
+    });
+  });
+
+  it('guarda como juego la sala que abre un estudiante, aunque pida evaluación', async () => {
+    const { servicio, memoria } = armar();
+    memoria.cursos.push({ id: 'curso-1', nombre: 'Paradigmas', docenteId: 'ana' });
+    const sala = await servicio.crear(
+      'quiz-1',
+      { id: 'lia', nombre: 'Lía', role: 'student' },
+      { modo: 'evaluacion', cursoId: 'curso-1', valorPorcentaje: 10, modalidad: 'academico' },
+    );
+    expect(sala.evaluacion).toBeUndefined();
+    await expect(servicio.unirse(sala.codigo, { id: 'nora', nombre: 'Nora' })).resolves.toMatchObject({
+      codigo: sala.codigo,
+    });
   });
 
   it('no abre una evaluación sin curso del docente', async () => {
