@@ -14,7 +14,7 @@ Assumption: use a single-node monolithic Tempo with a named local volume and Tem
 Acceptance: no external Grafana/OTLP exposure, service/resource state is checked after rollout, and the single-node/local-storage limitation is documented.
 
 ## Tasks
-- T1 (S1-S2) — Add production observability Compose/config and operational notes; inline; complete; commit pending.
+- T1 (S1-S2) — Add production observability Compose/config and operational notes; inline; complete; commits `ac9a8fd` and `25fbb2a`.
 - T2 (S1-S2) — Deploy the config to the authorized Droplet and verify production traces; inline; pending; commit pending.
 
 ## Log
