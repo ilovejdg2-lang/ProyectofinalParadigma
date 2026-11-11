@@ -27,6 +27,8 @@ export interface SolicitudProfesor {
 }
 
 export interface ClienteAutenticacion {
+  registrar(datos: RegistroPerfil & { rol: 'teacher' }): Promise<RegistroPendiente>
+  registrar(datos: RegistroPerfil & { rol?: 'student' }): Promise<Sesion>
   registrar(datos: RegistroPerfil): Promise<Sesion | RegistroPendiente>
   listarProfesoresPendientes(token: string): Promise<SolicitudProfesor[]>
   aceptarProfesor(token: string, id: string): Promise<void>
@@ -219,7 +221,7 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
       estado.recuperaciones = estado.recuperaciones.filter((item) => item.codigo !== recuperacion.codigo)
       guardar(almacen, estado)
     },
-  }
+  } as ClienteAutenticacion
 }
 
 function esSesion(cuerpo: Sesion | Perfil): cuerpo is Sesion {
@@ -354,5 +356,5 @@ export function crearAutenticacionHttp(baseUrl: string): ClienteAutenticacion {
       }
       if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
     },
-  }
+  } as ClienteAutenticacion
 }
