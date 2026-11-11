@@ -12,6 +12,14 @@ services:
     environment:
       JWT_ISSUER: ${AUTH_PUBLIC_URL:?Set AUTH_PUBLIC_URL in .env.production}
       FRONTEND_URL: ${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN in .env.production}
+      NODE_OPTIONS: --require=./dist/instrumentation.js
+      OTEL_SERVICE_NAME: actividades
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+    networks:
+      - default
+      - observability
 
   frontend:
     image: proyectofinalparadigma-frontend:${IMAGE_TAG:-latest}
@@ -32,3 +40,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+networks:
+  observability:
+    name: profelink-observability
+    external: true
