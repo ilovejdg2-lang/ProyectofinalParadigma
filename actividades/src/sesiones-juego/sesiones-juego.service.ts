@@ -13,7 +13,6 @@ import { IdentidadExterna } from '../autenticacion/identidad-externa';
 import { PrismaService } from '../prisma/prisma.service';
 import { AvisoSesiones, CambioSesion } from './aviso-sesiones';
 import { esAcierto, plazoVencido, puntosDeRespuesta, puntosPorAciertoDe } from './calificacion';
-import { CURSO_POR_DEFECTO } from '../cursos/curso-predeterminado';
 import { aciertosAcademicos, aportePorcentual, notaDeAciertos } from './nota-academica';
 import { codigoSala } from './codigo-sala';
 import {
@@ -114,7 +113,8 @@ export class SesionesJuegoService implements OnModuleDestroy {
             ...academica,
             ...this.datosJuego(
               config,
-              academica.modoAcademico === 'evaluacion' || config?.modalidad === 'academico',
+              identidad.role !== 'student' &&
+                (academica.modoAcademico === 'evaluacion' || config?.modalidad === 'academico'),
             ),
           },
           include: arbol,
@@ -194,12 +194,9 @@ export class SesionesJuegoService implements OnModuleDestroy {
       if (actual.anfitrionId === identidad.id) {
         return actual;
       }
-      if (actual.cursoId) {
+      if (actual.modoAcademico === 'evaluacion' && actual.cursoId) {
         const propioYa = actual.participantes.some((participante) => participante.perfilId === identidad.id);
-        if (!propioYa) {
-          if (actual.cursoId === CURSO_POR_DEFECTO.id) await this.matricularEnPredeterminado(identidad);
-          await this.exigirMatricula(actual.cursoId, identidad.id);
-        }
+        if (!propioYa) await this.exigirMatricula(actual.cursoId, identidad.id);
       }
       const propio = actual.participantes.find(
         (participante) => participante.perfilId === identidad.id,
@@ -290,6 +287,23 @@ export class SesionesJuegoService implements OnModuleDestroy {
       }
       const preguntas = jugables(actual.cuestionario?.preguntas ?? []);
       const base = instantaneaDe(preguntas);
+      let elegibles = actual.participantes.map((item) => item.id);
+      if (actual.modoAcademico === 'evaluacion' && actual.cursoId) {
+        const matriculados = new Set(
+          await this.idsMatriculados(
+            this.prisma.obtener() as unknown as ClienteAcademico,
+            actual.cursoId,
+          ),
+        );
+        const propios = actual.participantes.filter((item) => matriculados.has(item.perfilId));
+        if (propios.length === 0) {
+          throw new ConflictException({
+            mensaje:
+              'No hay estudiantes de este curso en la sala. Quien pertenece a otro curso no puede jugar esta evaluación.',
+          });
+        }
+        elegibles = propios.map((item) => item.id);
+      }
       const segundos = segundosDe(base.preguntas[0]);
       const iniciadaEn = new Date();
       const abreEn = new Date(iniciadaEn.getTime() + MILISEGUNDOS_CUENTA);
@@ -309,7 +323,7 @@ export class SesionesJuegoService implements OnModuleDestroy {
           iniciadaEn,
           iniciaEn: abreEn,
           cierraEn: new Date(abreEn.getTime() + segundos * 1000),
-          elegibles: actual.participantes.map((item) => item.id),
+          elegibles,
           preguntasInstantanea: instantanea as unknown as Prisma.InputJsonValue,
         },
       });
@@ -1001,6 +1015,17 @@ export class SesionesJuegoService implements OnModuleDestroy {
     identidad: IdentidadExterna,
     tituloCuestionario: string,
   ) {
+    if (identidad.role === 'student') {
+      return {
+        modoAcademico: 'practica',
+        cursoId: null,
+        cursoNombre: null,
+        nombreEvaluacion: null,
+        notaMaxima: 100,
+        valorPorcentaje: 0,
+        notaMinima: 70,
+      };
+    }
     const modo = config?.modo ?? 'practica';
     if (modo === 'practica' && !config?.cursoId) {
       return {
@@ -1057,35 +1082,10 @@ export class SesionesJuegoService implements OnModuleDestroy {
     }
     const fila = await cliente.matricula.findFirst({ where: { cursoId, estudianteId } });
     if (!fila) {
-      throw new ForbiddenException({ mensaje: 'Solo quien pertenece a este curso puede entrar a la partida.' });
+      throw new ForbiddenException({
+        mensaje: 'Esta evaluación es de otro curso. Solo pueden entrar los estudiantes asignados a ese curso.',
+      });
     }
-  }
-
-  private async matricularEnPredeterminado(identidad: IdentidadExterna) {
-    const cliente = this.prisma.obtener() as unknown as ClienteAcademico;
-    if (!cliente.curso?.upsert || !cliente.matricula?.upsert) return;
-    await cliente.curso.upsert({
-      where: { id: CURSO_POR_DEFECTO.id },
-      update: {},
-      create: {
-        id: CURSO_POR_DEFECTO.id,
-        nombre: CURSO_POR_DEFECTO.nombre,
-        docenteId: CURSO_POR_DEFECTO.docenteId,
-      },
-    });
-    const nombre = identidad.nombre.trim().slice(0, 80) || 'Estudiante';
-    await cliente.matricula.upsert({
-      where: {
-        cursoId_estudianteId: { cursoId: CURSO_POR_DEFECTO.id, estudianteId: identidad.id },
-      },
-      update: { nombre },
-      create: {
-        id: randomUUID(),
-        cursoId: CURSO_POR_DEFECTO.id,
-        estudianteId: identidad.id,
-        nombre,
-      },
-    });
   }
 
   private async escribirNotas(tx: ClienteSesion, fila: FilaSesion, jugadas: number) {

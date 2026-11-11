@@ -14,7 +14,7 @@ export function Inicio() {
         <p>
           Hola, {perfil?.nombre}. {esDocente
             ? 'Descubre un cuestionario, ábrelo en una sala y dirige la sesión interactiva con el grupo.'
-            : 'Explora cuestionarios para estudiar o ingresa a una sala en vivo con el código de tu profesor.'}
+            : 'Puedes crear un cuestionario y abrir una sala. Esa partida es solo un juego y no cuenta en ningún curso.'}
         </p>
       </section>
       <div className="rejilla">
@@ -26,23 +26,17 @@ export function Inicio() {
           </Link>
         </article>
 
-        {esDocente ? (
-          <article className="panel tarjeta-inicio acento-naranja">
-            <h2>Crear</h2>
-            <p className="meta">Arma preguntas de verdadero o falso, o con varias respuestas, y adjunta una imagen si la necesitas.</p>
-            <Link className="boton" to="/cuestionarios/nuevo">
-              Nuevo cuestionario
-            </Link>
-          </article>
-        ) : (
-          <article className="panel tarjeta-inicio acento-naranja">
-            <h2>Mi Historial</h2>
-            <p className="meta">Consulta tus resultados y puntuaciones de partidas anteriores.</p>
-            <Link className="boton" to="/historial">
-              Ver resultados
-            </Link>
-          </article>
-        )}
+        <article className="panel tarjeta-inicio acento-naranja">
+          <h2>Crear</h2>
+          <p className="meta">
+            {esDocente
+              ? 'Arma preguntas de verdadero o falso, o con varias respuestas, y adjunta una imagen si la necesitas.'
+              : 'Arma tu cuestionario y ábrelo en una sala. Queda como juego: no genera nota de curso.'}
+          </p>
+          <Link className="boton" to="/cuestionarios/nuevo">
+            Nuevo cuestionario
+          </Link>
+        </article>
 
         <article className="panel tarjeta-inicio acento-verde">
           <h2>Unirse</h2>

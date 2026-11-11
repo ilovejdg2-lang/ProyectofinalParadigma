@@ -145,6 +145,29 @@ describe('AuthService & Dominio de Políticas de Correo', () => {
       expect(res.perfil.correo).toBe('profesor@una.cr');
     });
 
+    it('al iniciar sesión puede elegir ser estudiante o profesor', async () => {
+      const comoEstudiante = await authService.iniciarSesion({
+        correo: 'profesor@una.cr',
+        contrasena: 'Profesor123!',
+        rol: 'student',
+      } as any);
+      expect(comoEstudiante.perfil.rol).toBe('student');
+
+      const comoProfesor = await authService.iniciarSesion({
+        correo: 'profesor@una.cr',
+        contrasena: 'Profesor123!',
+        rol: 'teacher',
+      } as any);
+      expect(comoProfesor.perfil.rol).toBe('teacher');
+
+      const admin = await authService.iniciarSesion({
+        correo: 'admin@una.cr',
+        contrasena: 'Admin123!',
+        rol: 'student',
+      } as any);
+      expect(admin.perfil.rol).toBe('admin');
+    });
+
     it('inicia sesión con el estudiante demo sembrado', async () => {
       const res = await authService.iniciarSesion({
         correo: 'estudiante@est.una.ac.cr',

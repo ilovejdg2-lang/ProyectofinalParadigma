@@ -43,7 +43,7 @@ export class CursosService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(identidad: IdentidadExterna) {
-    this.exigirDocente(identidad);
+    if (!this.esDocente(identidad)) return this.listarDelEstudiante(identidad.id);
     const cursos = await this.db().curso.findMany({
       where: { docenteId: identidad.id },
       orderBy: { nombre: 'asc' },
@@ -54,6 +54,16 @@ export class CursosService {
       nombre: curso.nombre,
       estudiantes: curso._count.matriculas,
     }));
+  }
+
+  async matriculas(identidad: IdentidadExterna, cursoId: string) {
+    this.exigirDocente(identidad);
+    const curso = await this.cursoPropio(identidad.id, cursoId);
+    const filas = await this.db().matricula.findMany({
+      where: { cursoId: curso.id },
+      orderBy: { nombre: 'asc' },
+    });
+    return filas.map((fila) => ({ estudianteId: fila.estudianteId, nombre: fila.nombre }));
   }
 
   async crear(identidad: IdentidadExterna, nombre: string) {
@@ -214,6 +224,20 @@ export class CursosService {
     });
     if (!sesion) throw new NotFoundException({ mensaje: 'No hay una evaluación con ese código.' });
     return sesion;
+  }
+
+  private async listarDelEstudiante(estudianteId: string) {
+    const filas = await this.db().matricula.findMany({
+      where: { estudianteId },
+      include: { curso: { include: { _count: { select: { matriculas: true } } } } },
+    });
+    return filas
+      .map((fila) => ({
+        id: fila.curso.id,
+        nombre: fila.curso.nombre,
+        estudiantes: fila.curso._count.matriculas,
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }
 
   private async cursoPropio(docenteId: string, cursoId: string) {

@@ -98,6 +98,7 @@ describe('acceso', () => {
     renderEn('/iniciar-sesion', crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() }))
     await usuario.type(await screen.findByLabelText('Correo electrónico'), CORREO_DEMO)
     await usuario.type(screen.getByLabelText('Contraseña'), CONTRASENA_DEMO)
+    await usuario.click(screen.getByRole('button', { name: 'Profesor' }))
     await usuario.click(screen.getByRole('button', { name: 'Iniciar Sesión' }))
     expect(await screen.findByRole('heading', { name: '¿Qué quieres ver?' })).toBeInTheDocument()
     await usuario.click(screen.getByRole('button', { name: /Cuestionarios/ }))
@@ -302,6 +303,7 @@ describe('partida y resultados', () => {
     expect(screen.getByText(`Inicia sesión para entrar a la partida ${sala.codigo}. No necesitas escribir el código.`)).toBeInTheDocument()
     await usuario.type(screen.getByLabelText('Correo electrónico'), estudiante.perfil.correo)
     await usuario.type(screen.getByLabelText('Contraseña'), 'Demo-2026')
+    await usuario.click(screen.getByRole('button', { name: 'Estudiante' }))
     await usuario.click(screen.getByRole('button', { name: 'Iniciar Sesión' }))
 
     expect(await screen.findByRole('heading', { name: 'Elige tu avatar' })).toBeInTheDocument()

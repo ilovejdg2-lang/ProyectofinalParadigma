@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -9,6 +10,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -103,6 +105,21 @@ export class AuthController {
     if (!claims) throw new UnauthorizedException({ mensaje: 'Token inválido o expirado.' });
 
     return this.auth.obtenerPerfil(claims.sub);
+  }
+
+  @Get('perfiles/buscar')
+  async buscarPorCorreo(
+    @Query('correo') correo = '',
+    @Headers('authorization') authHeader?: string,
+  ) {
+    const token = extraerTokenBearer(authHeader);
+    if (!token) throw new UnauthorizedException({ mensaje: 'No autorizado.' });
+    const claims = this.keys.verificarAccessToken(token);
+    if (!claims) throw new UnauthorizedException({ mensaje: 'Token inválido o expirado.' });
+    if (claims.role !== 'teacher' && claims.role !== 'admin') {
+      throw new ForbiddenException({ mensaje: 'Solo un profesor puede buscar estudiantes.' });
+    }
+    return this.auth.buscarPorCorreo(correo);
   }
 
   @Get('sesiones/actual')
