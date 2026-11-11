@@ -50,7 +50,7 @@ test('partida normal: cuestionario, seis estudiantes, puntos y podio', async ({ 
     const correcta = indice % 2 === 0 ? 0 : 1
     await page
       .getByRole('radiogroup', { name: `Respuesta correcta de la pregunta ${numero}` })
-      .getByRole('button', { name: 'Marcar' })
+      .getByRole('button', { name: /^(Marcar|Correcta)$/ })
       .nth(correcta)
       .click()
     await page.getByRole('button', { name: 'Listo' }).click()
@@ -81,7 +81,7 @@ test('partida normal: cuestionario, seis estudiantes, puntos y podio', async ({ 
   await page.getByRole('button', { name: 'Agregar pregunta' }).click()
   await page.getByLabel('Enunciado de la pregunta 10').fill(enunciados[9])
   await page.getByLabel('Segundos de la pregunta 10').fill('60')
-  await page.getByRole('radiogroup', { name: 'Respuesta correcta de la pregunta 10' }).getByRole('button', { name: 'Marcar' }).nth(1).click()
+  await page.getByRole('radiogroup', { name: 'Respuesta correcta de la pregunta 10' }).getByRole('button', { name: /^(Marcar|Correcta)$/ }).nth(1).click()
   await page.getByRole('button', { name: 'Listo' }).click()
   await page.getByRole('button', { name: 'Guardar cuestionario' }).click()
   await expect(page.getByText('editado y conservado')).toBeVisible()

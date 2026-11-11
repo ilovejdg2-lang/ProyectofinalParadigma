@@ -11,12 +11,13 @@ import {
   cuestionariosDemostracion,
   preguntasKanbanAcademicas,
 } from '../datos/demostracion.ts'
+import { opcionesDe } from '../dominio/opciones.ts'
 import { filtrarCuestionarios } from '../dominio/filtros.ts'
 import { validarEntradaPartida, validarImagen } from '../dominio/validacion.ts'
 import { rutasAplicacion } from '../rutas/Rutas.tsx'
 import { almacenMemoria } from '../servicios/almacen.ts'
 import { crearServicios, type Servicios } from '../servicios/crearServicios.ts'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 function entornoSimulado() {
   return { authUrl: '', actividadesUrl: '', canalUrl: '', simulacion: true }
@@ -121,9 +122,29 @@ describe('cuestionarios', () => {
     const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
     await entrarDemo(servicios)
     renderEn('/cuestionarios/nuevo', servicios)
+    await usuario.click(await screen.findByRole('button', { name: 'Editar' }))
+    await usuario.click(screen.getByRole('button', { name: 'Varias opciones' }))
     await usuario.click(await screen.findByRole('button', { name: 'Guardar cuestionario' }))
     expect(await screen.findByText('El título necesita al menos 3 caracteres.')).toBeInTheDocument()
     expect(screen.getByText('Indica la respuesta correcta de la pregunta 1.')).toBeInTheDocument()
+  })
+
+  it('guarda una partida de práctica con la respuesta elegida', async () => {
+    const usuario = userEvent.setup()
+    const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
+    const sesion = await entrarDemo(servicios)
+    const cuestionario = cuestionariosDemostracion()[0]
+    const pregunta = cuestionario.preguntas[0]
+    const opcion = opcionesDe(pregunta)[0]
+    const guardar = vi.spyOn(servicios.sala, 'guardarPartida')
+    renderEn(`/cuestionarios/${cuestionario.id}`, servicios)
+    await usuario.click(await screen.findByRole('button', { name: 'Practicar cuestionario' }))
+    await usuario.click(screen.getAllByRole('button', { name: opcion.texto })[0])
+    await usuario.click(screen.getByRole('button', { name: 'Guardar partida' }))
+    expect(guardar).toHaveBeenCalledWith(sesion.token, expect.objectContaining({
+      cuestionarioId: cuestionario.id,
+      respuestas: [{ preguntaId: pregunta.id, opcionId: opcion.id }],
+    }))
   })
 
   it('rechaza un archivo que no es una imagen permitida', () => {
