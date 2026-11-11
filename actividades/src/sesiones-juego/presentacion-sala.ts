@@ -1,3 +1,5 @@
+import { fichasEstrellas, juegoDeInstantanea, semillaDe, tableroMemoria } from './minijuegos';
+
 export interface OpcionInstantanea {
   id: string;
   texto: string;
@@ -22,6 +24,7 @@ export interface InstantaneaPreguntas {
   abreEn?: string;
   /** Copia congelada al iniciar. El docente la edita en el cuestionario. */
   puntosPorAcierto?: number;
+  juego?: import('./minijuegos').ConfigJuego;
 }
 
 export const MILISEGUNDOS_CUENTA = 4_500;
@@ -56,7 +59,7 @@ export interface SalaPublica {
   titulo: string;
   anfitrionId: string;
   anfitrionNombre: string;
-  estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada';
+  estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'minijuego' | 'finalizada';
   preguntaActual: number;
   segundos: number;
   puntosPorAcierto: number;
@@ -74,6 +77,16 @@ export interface SalaPublica {
     opciones: Array<{ id: string; texto: string; correcta?: boolean }>;
   }>;
   canal: 'remoto';
+  juego?: {
+    activo: boolean;
+    modalidad: 'academico' | 'competitivo';
+    tipo?: string;
+    ronda: number;
+    duracion: number;
+    mio: { puntos: number; titulo: string; detalle: Record<string, unknown> } | null;
+    fichas?: string[];
+    cartas?: number;
+  };
   evaluacion?: {
     cursoId: string;
     cursoNombre: string;
@@ -119,6 +132,8 @@ export interface FilaParticipante {
   conectado: boolean;
   puntaje: number;
   aciertos: number;
+  puntosMinijuegos?: number;
+  bonificacionVelocidad?: number;
   tiempoMs?: number;
   incorporadoEn?: Date | string;
   respuestas?: FilaRespuesta[];
@@ -146,6 +161,12 @@ export interface FilaSesion {
   notaMaxima?: number;
   valorPorcentaje?: number;
   notaMinima?: number;
+  modalidad?: string;
+  minijuegosActivos?: boolean;
+  tiposMinijuego?: string[];
+  cadaPreguntas?: number;
+  duracionMinijuego?: number;
+  velocidadActiva?: boolean;
   cuestionario?: {
     eliminadoEn?: Date | string | null;
     puntosPorAcierto?: number;
@@ -215,6 +236,26 @@ type Visibilidad = 'oculta' | 'abierta' | 'revelada';
  * ya cerradas: las anteriores a la actual, o la actual si el estado es
  * `cerrada`, `clasificacion` o `finalizada`.
  */
+function vistaJuego(fila: FilaSesion, perfilId?: string) {
+  const juego = juegoDeInstantanea(fila.preguntasInstantanea);
+  if (!juego) return undefined;
+  const mio = perfilId
+    ? juego.premios.find((premio) => premio.ronda === juego.ronda && premio.perfilId === perfilId)
+    : undefined;
+  const semilla = perfilId ? semillaDe(fila.id, juego.ronda, perfilId) : 0;
+  const enJuego = fila.estado === 'minijuego';
+  return {
+    activo: enJuego,
+    modalidad: juego.modalidad,
+    tipo: enJuego ? juego.tipo : undefined,
+    ronda: juego.ronda,
+    duracion: juego.duracion,
+    mio: mio ? { puntos: mio.puntos, titulo: mio.titulo, detalle: mio.detalle } : null,
+    fichas: enJuego && juego.tipo === 'estrellas' && perfilId ? fichasEstrellas(semilla) : undefined,
+    cartas: enJuego && juego.tipo === 'memoria' ? tableroMemoria(semilla).length : undefined,
+  };
+}
+
 function visibilidad(fila: FilaSesion, indice: number): Visibilidad {
   if (fila.estado === 'esperando' || indice > fila.preguntaActual)
     return 'oculta';
@@ -222,7 +263,8 @@ function visibilidad(fila: FilaSesion, indice: number): Visibilidad {
   if (
     fila.estado === 'cerrada' ||
     fila.estado === 'clasificacion' ||
-    fila.estado === 'finalizada'
+    fila.estado === 'finalizada' ||
+    fila.estado === 'minijuego'
   ) {
     return 'revelada';
   }
@@ -251,6 +293,7 @@ export function presentarSala(
     cierraEn: fila.cierraEn ? new Date(fila.cierraEn).toISOString() : null,
     elegibles: fila.elegibles ?? [],
     abreEn: abreEnDe(fila),
+    juego: vistaJuego(fila, perfilId),
     canal: 'remoto',
     ...(fila.modoAcademico === 'evaluacion' && fila.cursoId
       ? {

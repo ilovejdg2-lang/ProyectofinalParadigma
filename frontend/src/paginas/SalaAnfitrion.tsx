@@ -12,6 +12,7 @@ import { ClasificacionPantalla } from '../juego/ClasificacionPantalla.tsx'
 import { ControlesAudio } from '../juego/ControlesAudio.tsx'
 import { CuentaRegresiva } from '../juego/CuentaRegresiva.tsx'
 import { EscenarioPartida } from '../juego/EscenarioPartida.tsx'
+import { EscenaMinijuego } from '../juego/Minijuegos.tsx'
 import { FondoJuego } from '../juego/FondoJuego.tsx'
 import { GraficaGrupo } from '../juego/GraficaGrupo.tsx'
 import { OpcionesJuego } from '../juego/OpcionesJuego.tsx'
@@ -63,6 +64,7 @@ export function SalaAnfitrion() {
     if (sala.estado === 'pregunta') audio.efecto('jugar', `host-jugar-${sala.preguntaActual}`)
     if (sala.estado === 'cerrada') audio.efecto('clasificacion', `host-cierre-${sala.preguntaActual}`)
     if (sala.estado === 'clasificacion') audio.efecto('clasificacion', `host-clasif-${sala.preguntaActual}`)
+    if (sala.estado === 'minijuego') audio.efecto('suspenso', `host-mini-${sala.juego?.ronda ?? sala.preguntaActual}`)
   }, [marcaFase, sala])
 
   async function accion(operacion: () => Promise<unknown>) {
@@ -95,6 +97,7 @@ export function SalaAnfitrion() {
   const enCuenta = cuentaActiva(sala, ahora)
   const restante = sala.cierraEn ? Math.max(0, new Date(sala.cierraEn).getTime() - ahora) : 0
   const conteo = pregunta ? cuentaRespuestas(sala.participantes, pregunta.id, sala.elegibles) : { recibidas: 0, esperadas: sala.participantes.length }
+  const academico = Boolean(sala.evaluacion) || sala.juego?.modalidad === 'academico'
   const paisaje = paisajeDe(sala, ahora, restante)
   const tension = paisaje === 'suspenso' && restante > 0 && restante <= 10_000
   const enlace = enlaceDePartida(sala.codigo)
@@ -102,7 +105,7 @@ export function SalaAnfitrion() {
 
   if (sala.estado !== 'esperando') {
     const faseTexto =
-      sala.estado === 'pregunta' ? 'Pregunta' : sala.estado === 'cerrada' ? 'Resultados' : sala.estado === 'clasificacion' ? 'Clasificación' : 'Podio'
+      sala.estado === 'pregunta' ? 'Pregunta' : sala.estado === 'cerrada' ? 'Resultados' : sala.estado === 'clasificacion' ? 'Clasificación' : sala.estado === 'minijuego' ? 'Minijuego' : 'Podio'
     return (
       <EscenarioPartida fase={faseTexto} preguntaActual={sala.preguntaActual} total={sala.preguntas.length} paisaje={paisaje} tension={tension} pie={
         <>
@@ -114,6 +117,11 @@ export function SalaAnfitrion() {
           {sala.estado === 'clasificacion' ? (
             <button className="boton grande" type="button" disabled={ocupado} onClick={() => token && void accion(() => cliente.avanzar(token, sala.codigo, 'clasificacion'))}>
               {ultima ? 'Ver podio' : 'Siguiente pregunta'}
+            </button>
+          ) : null}
+          {sala.estado === 'minijuego' ? (
+            <button className="boton grande" type="button" disabled={ocupado} onClick={() => token && void accion(() => cliente.avanzar(token, sala.codigo, 'minijuego'))}>
+              Continuar
             </button>
           ) : null}
           {sala.estado === 'finalizada' ? <Link className="boton" to={`/resultados/${sala.codigo}`}>Ver reporte</Link> : null}
@@ -140,13 +148,16 @@ export function SalaAnfitrion() {
         {pregunta && sala.estado === 'clasificacion' ? (
           <ClasificacionPantalla participantes={sala.participantes} preguntaId={pregunta.id} perfilId={perfil?.id} />
         ) : null}
+        {sala.estado === 'minijuego' ? (
+          <EscenaMinijuego sala={sala} ahora={ahora} academico={academico} anfitrion onJugar={async () => undefined} />
+        ) : null}
         {sala.estado === 'finalizada' ? (
           <section className="final-partida">
             <header className="final-encabezado">
               <p className="meta">Clasificación final</p>
               <h1>{sala.titulo}</h1>
             </header>
-            <Podio participantes={sala.participantes} perfilId={perfil?.id} />
+            <Podio participantes={sala.participantes} perfilId={perfil?.id} academico={academico} total={sala.preguntas.length} />
           </section>
         ) : null}
       </EscenarioPartida>

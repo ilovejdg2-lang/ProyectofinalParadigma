@@ -67,7 +67,7 @@ interface SesionMemoriaFila {
   titulo: string;
   anfitrionId: string;
   anfitrionNombre: string;
-  estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada';
+  estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'minijuego' | 'finalizada';
   preguntaActual: number;
   segundos: number;
   iniciaEn: Date | null;

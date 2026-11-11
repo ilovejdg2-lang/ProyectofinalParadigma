@@ -16,13 +16,26 @@ interface PersonaPodio {
   tiempoMs?: number
 }
 
-export function Podio({ participantes, perfilId }: { participantes: PersonaPodio[]; perfilId?: string }) {
+export function Podio({
+  participantes,
+  perfilId,
+  academico = false,
+  total = 0,
+}: {
+  participantes: PersonaPodio[]
+  perfilId?: string
+  academico?: boolean
+  total?: number
+}) {
   const orden = ordenarClasificacion(participantes)
   const cima = orden.slice(0, 3)
   const firma = cima.map((item) => `${item.id}:${item.puntaje}`).join('|')
   const [revelados, setRevelados] = useState(0)
   const [explosion, setExplosion] = useState(0)
-  const reducido = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reducido =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const ordenRevela = cima.length >= 3 ? [3, 2, 1] : cima.length === 2 ? [2, 1] : [1]
 
   const hayEmpate = orden.some((item, indice) => {
@@ -88,8 +101,10 @@ export function Podio({ participantes, perfilId }: { participantes: PersonaPodio
                   <Avatar id={avatarVisible(participante.perfilId, participante.avatarId)} tamano={lugar === 1 ? 120 : 88} />
                   <strong>{participante.nombre}</strong>
                   <span>
-                    {participante.puntaje} pts · {participante.aciertos} aciertos
-                    {participante.tiempoMs ? ` · ${formatoSegundos(participante.tiempoMs)} s` : ''}
+                    {academico
+                      ? `${participante.aciertos} correctas${total > 0 ? ` · ${Math.round((participante.aciertos / total) * 100)}%` : ''}`
+                      : `${participante.puntaje} pts · ${participante.aciertos} aciertos`}
+                    {!academico && participante.tiempoMs ? ` · ${formatoSegundos(participante.tiempoMs)} s` : ''}
                   </span>
                 </div>
                 <div className="podio-base" aria-hidden="true">
@@ -106,10 +121,15 @@ export function Podio({ participantes, perfilId }: { participantes: PersonaPodio
             Tu posición: <strong>#{puestoMio}</strong>
           </p>
           <p>
-            {mio.puntaje} puntos · {mio.aciertos} aciertos
-            {mio.tiempoMs ? ` · ${formatoSegundos(mio.tiempoMs)} s` : ''}
+            {academico
+              ? `${mio.aciertos} correctas${total > 0 ? ` · ${Math.round((mio.aciertos / total) * 100)}%` : ''}`
+              : `${mio.puntaje} puntos · ${mio.aciertos} aciertos`}
+            {!academico && mio.tiempoMs ? ` · ${formatoSegundos(mio.tiempoMs)} s` : ''}
           </p>
         </article>
+      ) : null}
+      {academico ? (
+        <p className="meta">Resultado académico. Los minijuegos y la velocidad no modifican esta nota.</p>
       ) : null}
       {hayEmpate ? (
         <p className="meta">Si empatan en puntos y en rapidez, el puesto lo define el nombre en orden alfabético.</p>
@@ -122,8 +142,9 @@ export function Podio({ participantes, perfilId }: { participantes: PersonaPodio
               <Avatar id={avatarVisible(participante.perfilId, participante.avatarId)} tamano={36} />
               <strong>{participante.nombre}</strong>
               <span>
-                {participante.puntaje} pts · {participante.aciertos} aciertos
-                {participante.tiempoMs ? ` · ${formatoSegundos(participante.tiempoMs)} s` : ''}
+                {academico
+                  ? `${participante.aciertos} correctas${total > 0 ? ` · ${Math.round((participante.aciertos / total) * 100)}%` : ''}`
+                  : `${participante.puntaje} pts · ${participante.aciertos} aciertos`}
               </span>
             </li>
           ))}

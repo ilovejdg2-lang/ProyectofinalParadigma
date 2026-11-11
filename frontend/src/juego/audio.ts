@@ -19,6 +19,10 @@ export type Efecto =
   | 'podio-primero'
   | 'podio'
   | 'fanfarria'
+  | 'moneda'
+  | 'premio'
+  | 'fallo-juego'
+  | 'suspenso'
 
 interface Preferencia {
   musicaSilenciada: boolean
@@ -453,6 +457,23 @@ class MotorAudio {
         this.tono(784, ahora + 0.24, 0.16, 'triangle', 0.08, destino)
         this.tono(1047, ahora + 0.4, 0.4, 'sine', 0.09, destino)
         this.tono(1319, ahora + 0.55, 0.35, 'sine', 0.05, destino)
+        break
+      case 'moneda':
+        this.tono(988, ahora, 0.06, 'square', 0.04, destino)
+        this.tono(1319, ahora + 0.05, 0.1, 'sine', 0.05, destino)
+        break
+      case 'premio':
+        this.tono(523, ahora, 0.08, 'triangle', 0.06, destino)
+        this.tono(659, ahora + 0.08, 0.08, 'triangle', 0.06, destino)
+        this.tono(784, ahora + 0.16, 0.16, 'sine', 0.07, destino)
+        break
+      case 'fallo-juego':
+        this.tono(196, ahora, 0.16, 'sawtooth', 0.03, destino)
+        this.tono(146, ahora + 0.1, 0.22, 'triangle', 0.05, destino)
+        break
+      case 'suspenso':
+        this.tono(220, ahora, 0.12, 'sine', 0.04, destino)
+        this.tono(233, ahora + 0.12, 0.12, 'sine', 0.03, destino)
         break
     }
   }
