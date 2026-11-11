@@ -1,17 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Buho } from '../componentes/Buho.tsx'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
-import { leerTema } from '../tema.ts'
+import { guardarTema, leerTema, type Tema } from '../tema.ts'
 import { guardarEspacio, type Espacio } from './espacio.ts'
 
 export function ElegirEspacio() {
   const { perfil, salir } = useAutenticacion()
   const navegar = useNavigate()
+  const [tema, setTema] = useState<Tema>(() => leerTema())
 
   useEffect(() => {
-    document.documentElement.dataset.tema = leerTema()
-  }, [])
+    guardarTema(tema)
+  }, [tema])
 
   function elegir(espacio: Espacio) {
     guardarEspacio(espacio)
@@ -19,7 +20,15 @@ export function ElegirEspacio() {
   }
 
   return (
-    <main className="elegir">
+    <main className={`elegir${tema === 'claro' ? ' claro' : ''}`}>
+      <button
+        className="elegir-tema"
+        type="button"
+        aria-label={tema === 'oscuro' ? 'Activar modo claro' : 'Activar modo oscuro'}
+        onClick={() => setTema((actual) => (actual === 'claro' ? 'oscuro' : 'claro'))}
+      >
+        {tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'}
+      </button>
       <section className="elegir-panel">
         <div className="elegir-marca">
           <span className="elegir-logo">

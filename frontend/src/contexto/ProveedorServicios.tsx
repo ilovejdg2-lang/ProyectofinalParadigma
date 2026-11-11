@@ -19,12 +19,15 @@ export function useServicios(): Servicios {
   return servicios
 }
 
-// Si autenticacion.ts cambia en caliente, invalidamos este módulo para recrear el cliente.
+// Si el cableado de servicios o el entorno cambia en caliente, recreamos el cliente real.
 if (import.meta.hot) {
   import.meta.hot.accept('../servicios/autenticacion.ts', () => {
     import.meta.hot?.invalidate()
   })
   import.meta.hot.accept('../servicios/crearServicios.ts', () => {
+    import.meta.hot?.invalidate()
+  })
+  import.meta.hot.accept('../configuracion/entorno.ts', () => {
     import.meta.hot?.invalidate()
   })
 }

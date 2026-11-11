@@ -8,6 +8,7 @@ import { CONTRASENA_DEMO, CORREO_DEMO } from '../datos/demostracion.ts'
 import { mensajeDe } from '../dominio/errores.ts'
 import { codigoDeInvitacion } from '../componentes/CodigoQr.tsx'
 import { validarAcceso } from '../dominio/validacion.ts'
+import { guardarTema, leerTema, type Tema } from '../tema.ts'
 import { esEntradaDirecta, leerEspacio, limpiarEspacio } from './espacio.ts'
 
 export function InicioSesion() {
@@ -41,6 +42,11 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
   const [errores, setErrores] = useState<string[]>([])
   const [enviando, setEnviando] = useState(false)
   const [recuperar, setRecuperar] = useState(false)
+  const [tema, setTema] = useState<Tema>(() => leerTema())
+
+  useEffect(() => {
+    guardarTema(tema)
+  }, [tema])
 
   if (perfil) {
     if (esEntradaDirecta(destino)) return <Navigate to={destino} replace />
@@ -71,7 +77,15 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
   }
 
   return (
-    <main className="acceso">
+    <main className={`acceso${tema === 'claro' ? ' claro' : ''}`}>
+      <button
+        className="acceso-tema"
+        type="button"
+        aria-label={tema === 'oscuro' ? 'Activar modo claro' : 'Activar modo oscuro'}
+        onClick={() => setTema((actual) => (actual === 'claro' ? 'oscuro' : 'claro'))}
+      >
+        {tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'}
+      </button>
       <section className="acceso-panel">
         <form className="acceso-formulario" onSubmit={(evento) => void enviar(evento)}>
           <div className="acceso-marca">

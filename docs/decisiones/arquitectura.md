@@ -2,6 +2,8 @@
 
 Este documento justifica las decisiones técnicas y de diseño tomadas para la separación de servicios, criptografía, autorización y tiempo real en **ProfeLink**.
 
+**Estilo del sistema y organización interna (N-Capas / Vertical Slice):** ver [arquitectura-interna.md](arquitectura-interna.md). Ahí se declara el estilo de despliegue (dos APIs + frontend), la organización interna de cada proyecto, dónde viven las reglas del juego, los casos de uso, la entrada HTTP/WebSocket y el acceso a datos.
+
 ---
 
 ## 1. Despliegue de `auth-service` como Servicio Independiente

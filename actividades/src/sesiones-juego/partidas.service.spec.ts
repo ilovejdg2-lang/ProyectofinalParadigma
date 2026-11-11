@@ -469,6 +469,17 @@ describe('respuestas, cierre y resultados', () => {
       'marta',
     ]);
     expect(typeof resumen.finalizadaEn).toBe('string');
+    expect(resumen.preguntas.length).toBeGreaterThan(0);
+    expect(resumen.preguntas[0]).toMatchObject({
+      id: expect.any(String),
+      enunciado: expect.any(String),
+    });
+    const detalleLuis = resumen.participantes.find((item) => item.perfilId === 'luis');
+    expect(detalleLuis?.respuestas[0]).toMatchObject({
+      preguntaId: 'p1',
+      opcionId: 'p1a',
+      puntos: 1,
+    });
 
     const ajena = await rechazo(
       resultados.obtener(codigo, { id: 'nora', nombre: 'Nora' }),

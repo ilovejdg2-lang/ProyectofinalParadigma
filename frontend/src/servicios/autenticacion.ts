@@ -95,7 +95,7 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
       estado.usuarios.push(usuario)
       estado.sesiones.push({ token, perfilId: usuario.id })
       guardar(almacen, estado)
-      return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } }
+      return sesionDe(estado, token)!
     },
     async iniciarSesion(correo, contrasena) {
       const estado = leer(almacen)
@@ -106,7 +106,7 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
       const token = crearId()
       estado.sesiones.push({ token, perfilId: usuario.id })
       guardar(almacen, estado)
-      return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } }
+      return sesionDe(estado, token)!
     },
     async cerrarSesion(token) {
       const estado = leer(almacen)
