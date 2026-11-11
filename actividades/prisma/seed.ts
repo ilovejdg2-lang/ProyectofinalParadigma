@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '../src/generated/prisma/client';
-import { AUTOR_DEMOSTRACION } from '../src/autenticacion/identidad-externa';
 import {
   CUESTIONARIOS_BANCO,
   FECHA_SEMILLA,
@@ -33,70 +32,6 @@ async function main() {
         create: { ...imagen, creadoEn: FECHA_SEMILLA },
         update: imagen,
       });
-    }
-
-    for (const cuestionario of CUESTIONARIOS_BANCO) {
-      const datos = {
-        autorId: AUTOR_DEMOSTRACION.id,
-        autorNombre: AUTOR_DEMOSTRACION.nombre,
-        titulo: cuestionario.titulo,
-        descripcion: cuestionario.descripcion,
-        categoria: cuestionario.categoria,
-        etiquetas: cuestionario.etiquetas,
-        dificultad: cuestionario.dificultad,
-        esDemostracion: true,
-        imagenId: cuestionario.imagenId,
-        eliminadoEn: null,
-      };
-      await prisma.cuestionario.upsert({
-        where: { id: cuestionario.id },
-        create: {
-          id: cuestionario.id,
-          ...datos,
-          creadoEn: FECHA_SEMILLA,
-          actualizadoEn: FECHA_SEMILLA,
-        },
-        update: { ...datos, actualizadoEn: FECHA_SEMILLA },
-      });
-
-      for (const item of cuestionario.preguntas) {
-        const datosPregunta = {
-          enunciado: item.enunciado,
-          orden: item.orden,
-          respuestaCorrecta: item.respuestaCorrecta,
-          segundos: item.segundos ?? null,
-          imagenId: item.imagenId ?? null,
-        };
-        await prisma.pregunta.upsert({
-          where: { id: item.id },
-          create: {
-            id: item.id,
-            cuestionarioId: cuestionario.id,
-            ...datosPregunta,
-            creadoEn: FECHA_SEMILLA,
-            actualizadoEn: FECHA_SEMILLA,
-          },
-          update: { ...datosPregunta, actualizadoEn: FECHA_SEMILLA },
-        });
-
-        for (const opcion of item.opciones) {
-          await prisma.opcion.upsert({
-            where: { id: opcion.id },
-            create: {
-              id: opcion.id,
-              texto: opcion.texto,
-              orden: opcion.orden,
-              correcta: opcion.correcta,
-              preguntaId: item.id,
-            },
-            update: {
-              texto: opcion.texto,
-              orden: opcion.orden,
-              correcta: opcion.correcta,
-            },
-          });
-        }
-      }
     }
 
     for (const sesion of SESIONES_DEMOSTRACION) {
@@ -234,22 +169,16 @@ async function main() {
     }
 
     const total = await prisma.cuestionario.count({
-      where: { esDemostracion: true },
+      where: { eliminadoEn: null },
     });
-    const totalKanban = await prisma.cuestionario.count({
-      where: { categoria: 'Kanban', eliminadoEn: null },
-    });
-    console.log(
-      `Seed listo. Cuestionarios de demostración: ${total} (Kanban: ${totalKanban}).`,
-    );
+    console.log(`Seed listo. Cuestionarios visibles: ${total}.`);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main().catch(() => {
-  console.error(
-    'El seed no pudo completarse. Revisa DIRECT_URL sin compartir la cadena de conexión.',
-  );
+main().catch((error: unknown) => {
+  const texto = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  console.error(texto.replace(/postgres(?:ql)?:\/\/\S+/gi, '[url]'));
   process.exit(1);
 });

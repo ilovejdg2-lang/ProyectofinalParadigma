@@ -1254,5 +1254,104 @@
   .temporizador-fila.critico,
   .temporizador-fila.urgente .tiempo-restante,
   .temporizador-fila.critico .tiempo-restante,
-  .podio-corona { transform: none; animation: none; }
+  .podio-corona,
+  .cofre,
+  .estrella,
+  .ruleta-disco,
+  .minijuego-bomba { transform: none; animation: none; }
+}
+
+.minijuego {
+  min-height: 70vh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem 1rem 2rem;
+  text-align: center;
+}
+.minijuego-cabeza { display: grid; gap: 0.35rem; }
+.minijuego-cabeza h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 3rem); }
+.minijuego-tiempo {
+  justify-self: center;
+  min-width: 4.5rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: #2f7cf6;
+  color: white;
+  font-size: 1.4rem;
+}
+.minijuego-tiempo.urgente { background: #e11d48; animation: pulso-tiempo 0.6s ease-in-out infinite; }
+.minijuego-cofres, .minijuego-memoria {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  width: min(100%, 42rem);
+}
+.cofre, .carta, .estrella, .minijuego-bomba button {
+  min-width: 7.5rem;
+  min-height: 7.5rem;
+  border: 0;
+  border-radius: 1.25rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cofre {
+  background: linear-gradient(160deg, #f5c16c, #d97706);
+  color: #3b2410;
+  box-shadow: 0 12px 0 #9a5410;
+}
+.cofre.abierto { transform: translateY(6px) scale(1.04); box-shadow: 0 4px 0 #9a5410; }
+.cofre span, .carta { font-size: 2rem; }
+.carta {
+  width: 6.5rem;
+  background: #2f7cf6;
+  color: white;
+  transition: transform 0.35s ease;
+}
+.carta.volteada { background: white; color: #1e3a8a; transform: rotateY(0deg) scale(1.04); }
+.ruleta-disco {
+  width: min(78vw, 18rem);
+  height: min(78vw, 18rem);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(#2f7cf6 0 60deg, #38bdf8 60deg 120deg, #f5c16c 120deg 180deg, #34d399 180deg 240deg, #fb7185 240deg 300deg, #a78bfa 300deg 360deg);
+  transition: transform 1.6s cubic-bezier(0.12, 0.7, 0.1, 1);
+  box-shadow: 0 16px 40px rgb(47 124 246 / 35%);
+}
+.minijuego-estrellas { position: relative; width: min(100%, 40rem); height: 18rem; }
+.estrella {
+  position: absolute;
+  width: 3.4rem;
+  min-width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 50%;
+  background: #f5c16c;
+  color: #7c4a03;
+  animation: flotar-estrella 2.4s ease-in-out infinite;
+  left: calc((var(--estrella-i) % 4) * 22% + 4%);
+  top: calc((var(--estrella-i) % 3) * 28% + 8%);
+  animation-delay: calc(var(--estrella-i) * -0.2s);
+}
+.estrella.tomada { opacity: 0.35; animation: none; }
+.minijuego-bomba { font-size: 4rem; display: grid; justify-items: center; gap: 1rem; }
+.minijuego-bomba.tiembla { animation: sacudir 0.18s linear infinite; }
+.minijuego-resultado { font-size: 1.4rem; font-weight: 800; }
+.minijuego-aviso { max-width: 36rem; }
+@keyframes flotar-estrella {
+  50% { transform: translateY(-18px) scale(1.08); }
+}
+@keyframes sacudir {
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+@keyframes pulso-tiempo {
+  50% { transform: scale(1.06); }
+}
+@media (max-width: 720px) {
+  .cofre, .carta { min-width: 5.5rem; min-height: 5.5rem; }
+  .minijuego-estrellas { height: 16rem; }
 }

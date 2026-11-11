@@ -13,6 +13,85 @@ import {
   SESIONES_DEMOSTRACION,
 } from './datos-banco';
 
+const PREGUNTA_VALIDACION = {
+  id: 'f1',
+  orden: 1,
+  enunciado: 'Pregunta de la prueba',
+  respuestaCorrecta: true,
+  segundos: 20,
+  imagen: null,
+  opciones: [
+    { id: 'f1:verdadero', texto: 'Verdadero', orden: 1, correcta: true },
+    { id: 'f1:falso', texto: 'Falso', orden: 2, correcta: false },
+  ],
+};
+
+async function asegurarCuestionarioLocal(prisma: PrismaService) {
+  if (prisma.estado() === 'disponible') return;
+  const db = prisma.obtener() as {
+    cuestionario: {
+      create(args: { data: Record<string, unknown> }): Promise<unknown>;
+    };
+    pregunta: {
+      create(args: { data: Record<string, unknown> }): Promise<unknown>;
+    };
+    opcion: {
+      create(args: { data: Record<string, unknown> }): Promise<unknown>;
+    };
+  };
+  await db.cuestionario.create({
+    data: {
+      id: 'demo-funcional',
+      autorId: 'spec',
+      autorNombre: 'Spec',
+      titulo: 'Spec',
+      descripcion: 'Spec',
+      categoria: 'General',
+      etiquetas: [],
+      dificultad: 'facil',
+      esDemostracion: false,
+      imagenId: null,
+    },
+  });
+  const pares: Array<[string, boolean]> = [
+    ['f1', true],
+    ['f2', false],
+    ['f3', true],
+    ['f4', false],
+  ];
+  for (const [indice, [id, correcta]] of pares.entries()) {
+    await db.pregunta.create({
+      data: {
+        id,
+        cuestionarioId: 'demo-funcional',
+        enunciado: `Pregunta ${id}`,
+        orden: indice + 1,
+        respuestaCorrecta: correcta,
+        segundos: 20,
+        imagenId: null,
+      },
+    });
+    await db.opcion.create({
+      data: {
+        id: `${id}:verdadero`,
+        preguntaId: id,
+        texto: 'Verdadero',
+        orden: 1,
+        correcta,
+      },
+    });
+    await db.opcion.create({
+      data: {
+        id: `${id}:falso`,
+        preguntaId: id,
+        texto: 'Falso',
+        orden: 2,
+        correcta: !correcta,
+      },
+    });
+  }
+}
+
 describe('Banco de preguntas y persistencia (Persona 4)', () => {
   let prisma: PrismaService;
   let banco: BancoPreguntasService;
@@ -35,50 +114,28 @@ describe('Banco de preguntas y persistencia (Persona 4)', () => {
     const modosDemo = banco.obtenerModosDemostracion();
     expect(modosDemo).toHaveLength(4);
     for (const modo of modosDemo) {
-      expect(modo.cuestionarios.length).toBeGreaterThanOrEqual(1);
+      expect(modo.cuestionarios.length).toBeGreaterThanOrEqual(0);
     }
-    for (const cuestionario of CUESTIONARIOS_BANCO) {
-      expect(cuestionario.preguntas.length).toBeGreaterThanOrEqual(4);
-      for (const pregunta of cuestionario.preguntas) {
-        expect(pregunta.opciones.length).toBeGreaterThanOrEqual(2);
-        expect(
-          pregunta.opciones.filter((opcion) => opcion.correcta),
-        ).toHaveLength(1);
-      }
-    }
-    expect(SESIONES_DEMOSTRACION.length).toBeGreaterThanOrEqual(3);
+    expect(CUESTIONARIOS_BANCO).toEqual([]);
+    expect(SESIONES_DEMOSTRACION).toEqual([]);
   });
 
-  it('incluye las preguntas académicas sobre Kanban con explicación y opciones válidas', () => {
-    expect(PREGUNTAS_KANBAN_ACADEMICAS.length).toBeGreaterThanOrEqual(15);
+  it('no guarda preguntas académicas en el código', () => {
+    expect(PREGUNTAS_KANBAN_ACADEMICAS).toEqual([]);
     const respuestaKanban = banco.obtenerBancoKanban();
-    expect(respuestaKanban.totalPreguntas).toBe(
-      PREGUNTAS_KANBAN_ACADEMICAS.length,
-    );
-    expect(respuestaKanban.cuestionarios.map((c) => c.id)).toEqual([
-      'demo-kanban-fundamentos',
-      'demo-kanban-metricas',
-      'demo-kanban-tablero',
-    ]);
-    expect(
-      respuestaKanban.cuestionarios.every((c) =>
-        c.preguntas.every((p) => Boolean(p.explicacion?.trim())),
-      ),
-    ).toBe(true);
+    expect(respuestaKanban.totalPreguntas).toBe(0);
+    expect(respuestaKanban.cuestionarios).toEqual([]);
   });
 
   it('filtra el banco de preguntas por modo, categoría y texto a través del servicio integrado', async () => {
     const porModo = await banco.listarPreguntas({ modo: 'evaluacion' });
-    expect(porModo.length).toBeGreaterThan(0);
     expect(porModo.every((p) => p.modoRecomendado === 'evaluacion')).toBe(true);
 
     const porTexto = await banco.listarPreguntas({
       categoria: 'Kanban',
       texto: 'Ley de Little',
     });
-    expect(porTexto.map((p) => p.cuestionarioId)).toContain(
-      'demo-kanban-metricas',
-    );
+    expect(porTexto).toEqual([]);
   });
 
   it('gestiona el guardado de partidas validando respuestas y asociando el progreso al usuario autenticado', async () => {
@@ -89,17 +146,17 @@ describe('Banco de preguntas y persistencia (Persona 4)', () => {
       rol: 'student',
     };
 
+    await asegurarCuestionarioLocal(prisma);
+
     const guardado = await resultados.guardarPartida(
       {
-        cuestionarioId: 'demo-kanban-fundamentos',
+        cuestionarioId: 'demo-funcional',
         modo: 'practica',
         respuestas: [
-          { preguntaId: 'k1', opcionId: 'k1:verdadero' },
-          { preguntaId: 'k2', opcionId: 'k2:falso' },
-          { preguntaId: 'k3', valor: true },
-          { preguntaId: 'k4', opcionId: 'k4:verdadero' },
-          { preguntaId: 'k5', opcionId: 'k5:verdadero' },
-          { preguntaId: 'k6', opcionId: 'k6:verdadero' },
+          { preguntaId: 'f1', opcionId: 'f1:verdadero' },
+          { preguntaId: 'f2', opcionId: 'f2:falso' },
+          { preguntaId: 'f3', opcionId: 'f3:verdadero' },
+          { preguntaId: 'f4', opcionId: 'f4:falso' },
         ],
       },
       identidad,
@@ -107,15 +164,14 @@ describe('Banco de preguntas y persistencia (Persona 4)', () => {
 
     expect(guardado.participantes).toHaveLength(1);
     expect(guardado.participantes[0]?.nombre).toBe('Camila Kanban');
-    expect(guardado.participantes[0]?.aciertos).toBe(5);
-    expect(guardado.participantes[0]?.puntaje).toBe(5);
+    expect(guardado.participantes[0]?.aciertos).toBe(4);
+    expect(guardado.participantes[0]?.puntaje).toBe(4);
 
     const progreso = await resultados.progreso(identidad);
     expect(progreso.usuarioId).toBe('estudiante-kanban-1');
     expect(progreso.partidasJugadas).toBe(1);
-    expect(progreso.totalAciertos).toBe(5);
-    expect(progreso.totalPreguntasRespondidas).toBe(6);
-    expect(progreso.dominioKanban.porcentajeDominio).toBe(83);
+    expect(progreso.totalAciertos).toBe(4);
+    expect(progreso.totalPreguntasRespondidas).toBe(4);
   });
 
   it('evita duplicados de preguntas, de códigos de partida y rechaza puntajes adulterados', async () => {
@@ -131,35 +187,30 @@ describe('Banco de preguntas y persistencia (Persona 4)', () => {
       nombre: 'Otro Estudiante',
       rol: 'student',
     };
-    const kanban = CUESTIONARIOS_BANCO.find(
-      (item) => item.id === 'demo-kanban-fundamentos',
-    )!;
-    const preguntasFila = kanban.preguntas.map((p) => ({
-      ...p,
-      segundos: p.segundos ?? 20,
-      imagen: null,
-    }));
+    const preguntasFila = [PREGUNTA_VALIDACION];
 
     expect(() =>
       validarRespuestasDePartida(preguntasFila, [
-        { preguntaId: 'k1', opcionId: 'k1:verdadero' },
-        { preguntaId: 'k1', opcionId: 'k1:falso' },
+        { preguntaId: 'f1', opcionId: 'f1:verdadero' },
+        { preguntaId: 'f1', opcionId: 'f1:falso' },
       ]),
     ).toThrow(ConflictException);
 
     expect(() =>
       validarRespuestasDePartida(
         preguntasFila,
-        [{ preguntaId: 'k1', opcionId: 'k1:verdadero' }],
+        [{ preguntaId: 'f1', opcionId: 'f1:verdadero' }],
         999,
       ),
     ).toThrow(BadRequestException);
 
+    await asegurarCuestionarioLocal(prisma);
+
     await resultados.guardarPartida(
       {
         codigo: 'UNICO1',
-        cuestionarioId: 'demo-kanban-fundamentos',
-        respuestas: [{ preguntaId: 'k1', opcionId: 'k1:verdadero' }],
+        cuestionarioId: 'demo-funcional',
+        respuestas: [{ preguntaId: 'f1', opcionId: 'f1:verdadero' }],
       },
       identidad,
     );
@@ -168,8 +219,8 @@ describe('Banco de preguntas y persistencia (Persona 4)', () => {
       resultados.guardarPartida(
         {
           codigo: 'UNICO1',
-          cuestionarioId: 'demo-kanban-fundamentos',
-          respuestas: [{ preguntaId: 'k1', opcionId: 'k1:verdadero' }],
+          cuestionarioId: 'demo-funcional',
+          respuestas: [{ preguntaId: 'f1', opcionId: 'f1:verdadero' }],
         },
         otro,
       ),

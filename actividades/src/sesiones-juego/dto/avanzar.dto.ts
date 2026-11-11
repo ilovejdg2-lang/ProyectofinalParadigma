@@ -2,6 +2,6 @@ import { IsIn, IsOptional } from 'class-validator';
 
 export class AvanzarDto {
   @IsOptional()
-  @IsIn(['cerrada', 'clasificacion'])
-  desde?: 'cerrada' | 'clasificacion';
+  @IsIn(['cerrada', 'clasificacion', 'minijuego'])
+  desde?: 'cerrada' | 'clasificacion' | 'minijuego';
 }

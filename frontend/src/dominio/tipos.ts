@@ -91,7 +91,9 @@ export interface BorradorCuestionario {
   preguntas: BorradorPregunta[]
 }
 
-export type EstadoSala = 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'finalizada'
+export type EstadoSala = 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'minijuego' | 'finalizada'
+
+export type TipoMinijuego = 'cofres' | 'ruleta' | 'estrellas' | 'memoria' | 'bomba'
 
 export interface RespuestaParticipante {
   preguntaId: string
@@ -142,6 +144,30 @@ export interface Sala {
     valorPorcentaje: number
     notaMinima: number
   }
+  juego?: {
+    activo: boolean
+    modalidad: 'academico' | 'competitivo'
+    tipo?: TipoMinijuego
+    ronda: number
+    duracion: number
+    mio: { puntos: number; titulo: string; detalle: Record<string, unknown> } | null
+    fichas?: string[]
+    cartas?: number
+  }
+  partidaLocal?: PartidaLocal
+}
+
+export interface PartidaLocal {
+  modalidad: 'academico' | 'competitivo'
+  activos: boolean
+  tipos: TipoMinijuego[]
+  cada: number
+  duracion: number
+  velocidad: boolean
+  ronda: number
+  tipo?: TipoMinijuego
+  premios: Array<{ perfilId: string; ronda: number; puntos: number; titulo: string; detalle: Record<string, unknown> }>
+  puntosMinijuegos: Record<string, number>
 }
 
 export interface ConfiguracionSala {
@@ -151,6 +177,12 @@ export interface ConfiguracionSala {
   notaMaxima?: number
   valorPorcentaje?: number
   notaMinima?: number
+  modalidad?: 'academico' | 'competitivo'
+  minijuegosActivos?: boolean
+  tiposMinijuego?: TipoMinijuego[]
+  cadaPreguntas?: number
+  duracionMinijuego?: number
+  velocidadActiva?: boolean
 }
 
 export interface ResultadoImagen {

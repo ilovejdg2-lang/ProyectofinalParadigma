@@ -20,6 +20,7 @@ import {
 import type { ClienteActividades } from './actividades.ts'
 import type { ClienteAutenticacion } from './autenticacion.ts'
 import { puntosDeRespuesta } from '../juego/puntuacion.ts'
+import { fichasDe, puntosPorVelocidad, resolverLocal, semillaDe, tableroDe, vistaLocal } from '../juego/reglasMinijuego.ts'
 import type { Almacen } from './almacen.ts'
 
 export type EstadoConexion = 'conectado' | 'desconectado' | 'error'
@@ -39,6 +40,7 @@ export interface ClienteSala {
   responder(token: string, codigo: string, valor: boolean | string): Promise<Sala>
   cerrarPregunta(token: string, codigo: string): Promise<Sala>
   avanzar(token: string, codigo: string, desde?: Sala['estado']): Promise<Sala>
+  jugarMinijuego(token: string, codigo: string, accion: { indice?: number; fichas?: string[]; cartas?: number[] }): Promise<Sala>
   guardarPartida(token: string, entrada: EntradaGuardarPartida): Promise<ResumenResultado>
   historial(token: string): Promise<ResumenResultado[]>
   progreso(token: string): Promise<ProgresoUsuario>
@@ -189,10 +191,18 @@ export function crearSalaSimulada(
       const enviada = respuesta.enviadaEn ? new Date(respuesta.enviadaEn).getTime() : inicio
       const transcurrido = Math.max(0, enviada - inicio)
       respuesta.milisegundos = transcurrido
-      respuesta.puntos = puntosDeRespuesta(acierto(pregunta, respuesta), sala.puntosPorAcierto ?? 1)
+      const competitivo = sala.partidaLocal?.modalidad === 'competitivo' && !sala.evaluacion
+      const totalMs = Math.max(1, sala.segundos) * 1000
+      respuesta.puntos = competitivo
+        ? puntosPorVelocidad(acierto(pregunta, respuesta), transcurrido, totalMs, sala.partidaLocal?.velocidad !== false).total
+        : puntosDeRespuesta(acierto(pregunta, respuesta), sala.puntosPorAcierto ?? 1)
     }
     for (const participante of sala.participantes) {
-      participante.puntaje = participante.respuestas.reduce((suma, item) => suma + item.puntos, 0)
+      const base = participante.respuestas.reduce((suma, item) => suma + item.puntos, 0)
+      const extra = sala.partidaLocal?.modalidad === 'competitivo' && !sala.evaluacion
+        ? sala.partidaLocal.puntosMinijuegos[participante.perfilId] ?? 0
+        : 0
+      participante.puntaje = base + extra
       participante.aciertos = participante.respuestas.filter((item) => item.puntos > 0).length
       participante.tiempoMs = participante.respuestas.reduce(
         (suma, item) => suma + (item.puntos > 0 ? (item.milisegundos ?? 0) : 0),
@@ -241,7 +251,7 @@ export function crearSalaSimulada(
     reconectar() {
       conexion = 'conectado'
     },
-    async crear(token, cuestionarioId) {
+    async crear(token, cuestionarioId, config) {
       exigirConexion()
       const perfil = await exigirPerfil(autenticacion, token)
       const cuestionario = await actividades.obtener(cuestionarioId)
@@ -265,7 +275,21 @@ export function crearSalaSimulada(
         participantes: [],
         preguntas: copiarPreguntas(cuestionario.preguntas),
         canal: 'simulado',
+        partidaLocal: config?.minijuegosActivos
+          ? {
+              modalidad: config.modo === 'evaluacion' || config.modalidad === 'academico' ? 'academico' : 'competitivo',
+              activos: true,
+              tipos: config.tiposMinijuego?.length ? config.tiposMinijuego : ['cofres', 'ruleta', 'estrellas', 'memoria', 'bomba'],
+              cada: config.cadaPreguntas ?? 3,
+              duracion: config.duracionMinijuego ?? 8,
+              velocidad: config.modo === 'evaluacion' || config.modalidad === 'academico' ? false : config.velocidadActiva !== false,
+              ronda: 0,
+              premios: [],
+              puntosMinijuegos: {},
+            }
+          : undefined,
       }
+      if (sala.partidaLocal) sala.juego = vistaLocal(sala.partidaLocal, perfil.id, sala.codigo, false)
       estado.salas[codigo] = sala
       guardarSalas(almacen, estado)
       publicar(codigo, sala)
@@ -305,8 +329,10 @@ export function crearSalaSimulada(
     },
     async obtener(token, codigo) {
       exigirConexion()
-      await exigirPerfil(autenticacion, token)
-      return exigirSala(leerSalas(almacen), codigo)
+      const perfil = await exigirPerfil(autenticacion, token)
+      const sala = exigirSala(leerSalas(almacen), codigo)
+      if (sala.partidaLocal) sala.juego = vistaLocal(sala.partidaLocal, perfil.id, sala.codigo, sala.estado === 'minijuego')
+      return sala
     },
     suscribir(codigo, _token, alCambiar) {
       const normalizado = codigo.toUpperCase()
@@ -432,8 +458,22 @@ export function crearSalaSimulada(
         publicar(sala.codigo, sala)
         return sala
       }
-      if (sala.estado !== 'clasificacion') {
+      if (sala.estado !== 'clasificacion' && sala.estado !== 'minijuego') {
         throw new ErrorServicio('estado', 'Cierra la pregunta antes de avanzar.')
+      }
+      const local = sala.partidaLocal
+      if (sala.estado === 'clasificacion' && local?.activos) {
+        const respondidas = sala.preguntaActual + 1
+        if (respondidas < sala.preguntas.length && respondidas % local.cada === 0 && local.tipos.length > 0) {
+          local.tipo = local.tipos[local.ronda % local.tipos.length]
+          local.ronda += 1
+          sala.estado = 'minijuego'
+          sala.cierraEn = new Date(Date.now() + local.duracion * 1000).toISOString()
+          sala.juego = vistaLocal(local, perfil.id, sala.codigo, true)
+          guardarSalas(almacen, estado)
+          publicar(sala.codigo, sala)
+          return sala
+        }
       }
       if (sala.preguntaActual + 1 >= sala.preguntas.length) {
         sala.estado = 'finalizada'
@@ -454,6 +494,63 @@ export function crearSalaSimulada(
         abrirPregunta(sala, sala.preguntaActual + 1)
         programarReloj(sala)
       }
+      guardarSalas(almacen, estado)
+      publicar(sala.codigo, sala)
+      return sala
+    },
+    async jugarMinijuego(token, codigo, accion) {
+      exigirConexion()
+      const perfil = await exigirPerfil(autenticacion, token)
+      const estado = leerSalas(almacen)
+      const sala = exigirSala(estado, codigo)
+      const local = sala.partidaLocal
+      if (sala.estado !== 'minijuego' || !local?.tipo) {
+        throw new ErrorServicio('estado', 'No hay un minijuego abierto.')
+      }
+      const ronda = local.ronda
+      const previo = local.premios.find((item) => item.ronda === ronda && item.perfilId === perfil.id)
+      const repetible = local.tipo === 'estrellas' || local.tipo === 'memoria'
+      if (previo && !repetible) {
+        sala.juego = vistaLocal(local, perfil.id, sala.codigo, true)
+        return sala
+      }
+      const semilla = semillaDe(sala.codigo, ronda, perfil.id)
+      const academico = local.modalidad === 'academico' || Boolean(sala.evaluacion)
+      let capturas = 0
+      let parejas = 0
+      let halladas: number[] = Array.isArray(previo?.detalle.parejasHalladas)
+        ? previo.detalle.parejasHalladas.filter((item): item is number => typeof item === 'number')
+        : []
+      if (local.tipo === 'estrellas') {
+        const validas = new Set(fichasDe(semilla))
+        capturas = new Set((accion.fichas ?? []).filter((id) => validas.has(id))).size
+      }
+      if (local.tipo === 'memoria' && accion.cartas?.length === 2) {
+        const tablero = tableroDe(semilla)
+        const [a, b] = accion.cartas
+        const conjunto = new Set(halladas)
+        if (a !== b && tablero[a] !== undefined && tablero[a] === tablero[b]) conjunto.add(tablero[a])
+        halladas = [...conjunto]
+        parejas = halladas.length
+      }
+      const inicio = sala.cierraEn ? new Date(sala.cierraEn).getTime() - local.duracion * 1000 : Date.now()
+      const resultado = resolverLocal(local.tipo, semilla, {
+        indice: accion.indice,
+        capturas,
+        parejas,
+        detenidaEnMs: Date.now() - inicio,
+      }, academico)
+      const puntos = Math.max(previo?.puntos ?? 0, resultado.puntos)
+      const delta = puntos - (previo?.puntos ?? 0)
+      const premio = { perfilId: perfil.id, ronda, puntos, titulo: resultado.titulo, detalle: { ...resultado.detalle, parejasHalladas: halladas } }
+      if (previo) Object.assign(previo, premio)
+      else local.premios.push(premio)
+      if (delta > 0 && !academico) {
+        local.puntosMinijuegos[perfil.id] = (local.puntosMinijuegos[perfil.id] ?? 0) + delta
+        const jugador = sala.participantes.find((item) => item.perfilId === perfil.id)
+        if (jugador) jugador.puntaje += delta
+      }
+      sala.juego = vistaLocal(local, perfil.id, sala.codigo, true)
       guardarSalas(almacen, estado)
       publicar(sala.codigo, sala)
       return sala
@@ -613,6 +710,8 @@ export function crearSalaHttp(baseUrl: string, canalUrl: string): ClienteSala {
     cerrarPregunta: (token, codigo) => enviar(token, `/sesiones-juego/${codigo}/cerrar`, 'POST', {}),
     avanzar: (token, codigo, desde) =>
       enviar(token, `/sesiones-juego/${codigo}/avanzar`, 'POST', desde ? { desde } : {}),
+    jugarMinijuego: (token, codigo, accion) =>
+      enviar(token, `/sesiones-juego/${codigo}/minijuego`, 'POST', accion),
     async guardarPartida(token, entrada) {
       const respuesta = await fetch(`${raiz}/resultados/partidas`, {
         method: 'POST',

@@ -24,6 +24,7 @@ enum EstadoSesion {
   pregunta
   cerrada
   clasificacion
+  minijuego
   finalizada
 }
 
@@ -138,6 +139,12 @@ model SesionJuego {
   notaMaxima       Int      @default(100)
   valorPorcentaje  Int      @default(0)
   notaMinima       Int      @default(70)
+  modalidad        String   @default("clasico") @db.VarChar(20)
+  minijuegosActivos Boolean @default(false)
+  tiposMinijuego   String[] @default(["cofres", "ruleta", "estrellas", "memoria", "bomba"])
+  cadaPreguntas    Int      @default(3)
+  duracionMinijuego Int     @default(8)
+  velocidadActiva  Boolean  @default(false)
 
   participantes Participante[]
   respuestas    Respuesta[]
@@ -205,6 +212,8 @@ model Participante {
   aciertos       Int         @default(0)
   /// Suma de milisegundos de los aciertos. El podio desempata con este valor.
   tiempoMs       Int         @default(0)
+  puntosMinijuegos Int       @default(0)
+  bonificacionVelocidad Int  @default(0)
   incorporadoEn  DateTime    @default(now()) @db.Timestamptz(3)
 
   respuestas Respuesta[]

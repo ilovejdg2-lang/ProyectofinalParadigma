@@ -310,6 +310,10 @@ export class AvisoSesionesCanal extends AvisoSesiones {
         return 'LeaderboardShown';
       case 'pregunta-cambiada':
         return 'QuestionShown';
+      case 'minijuego-iniciado':
+        return 'MinigameStarted';
+      case 'minijuego-resuelto':
+        return 'MinigameResolved';
       case 'sesion-finalizada':
         return 'GameEnded';
       case 'presencia-actualizada':

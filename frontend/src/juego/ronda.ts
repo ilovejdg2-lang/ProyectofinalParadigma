@@ -19,6 +19,7 @@ export function faseCuenta(abreEn: string, ahora: number): '3' | '2' | '1' | 'ya
 
 export function paisajeDe(sala: Pick<Sala, 'estado' | 'preguntaActual' | 'abreEn'>, ahora: number, restante: number): Paisaje {
   if (sala.estado === 'esperando') return 'espera'
+  if (sala.estado === 'minijuego') return 'suspenso'
   if (sala.estado === 'clasificacion' || sala.estado === 'finalizada') return 'victoria'
   if (sala.estado === 'cerrada') return 'silencio'
   if (cuentaActiva(sala, ahora)) return 'silencio'

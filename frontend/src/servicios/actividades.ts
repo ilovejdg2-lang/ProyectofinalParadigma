@@ -27,7 +27,7 @@ export interface ClienteActividades {
   cargarImagen(token: string, archivo: File): Promise<ResultadoImagen>
 }
 
-const CLAVE = 'profelink.cuestionarios.v1'
+const CLAVE = 'profelink.cuestionarios.v3'
 
 function deduplicarCuestionarios(lista: Cuestionario[]): Cuestionario[] {
   const vistos = new Set<string>()

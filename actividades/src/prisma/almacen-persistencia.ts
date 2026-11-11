@@ -94,7 +94,7 @@ export interface SesionFilaLocal {
   titulo: string;
   anfitrionId: string;
   anfitrionNombre: string;
-  estado: 'esperando' | 'pregunta' | 'cerrada' | 'finalizada';
+  estado: 'esperando' | 'pregunta' | 'cerrada' | 'clasificacion' | 'minijuego' | 'finalizada';
   preguntaActual: number;
   segundos: number;
   cierraEn: Date | null;

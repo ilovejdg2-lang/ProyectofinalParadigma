@@ -331,8 +331,8 @@ a { color: inherit; }
 .buscador:focus, .campo:focus, .seleccion:focus, .area:focus { border-color: var(--azul); }
 .area { min-height: 90px; resize: vertical; }
 .filtros, .fila, .acciones { display: flex; gap: 10px; flex-wrap: wrap; }
-.filtros { margin: 14px 0 18px; }
-.filtros .seleccion, .filtros .buscador { max-width: 280px; }
+.filtros { margin: 14px 0 18px; width: 100%; min-width: 0; }
+.filtros .seleccion, .filtros .buscador { flex: 1 1 180px; max-width: none; min-height: 44px; }
 
 .boton, .boton-fantasma, .boton-peligro, .boton-exito {
   border: 0;
@@ -355,6 +355,9 @@ a { color: inherit; }
 
 .rejilla {
   display: grid;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
   gap: 16px;
 }
@@ -437,9 +440,12 @@ a { color: inherit; }
 }
 .rejilla-mios { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
 .descubrir-busca .buscador { width: 100%; max-width: none; min-height: 48px; border-radius: 14px; border-color: rgba(47, 124, 246, 0.45); }
-.rejilla-descubrir { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.rejilla-descubrir { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .descubrimiento {
   display: grid;
+  grid-template-rows: 148px minmax(0, 1fr);
+  min-width: 0;
+  height: 100%;
   text-decoration: none;
   color: inherit;
   background: #111820;
@@ -449,13 +455,25 @@ a { color: inherit; }
 }
 .descubrimiento:hover { border-color: var(--acento); }
 .descubrimiento-portada {
-  height: 156px;
+  height: 148px;
   position: relative;
   background: color-mix(in srgb, var(--acento) 18%, #0e1724) center/cover no-repeat;
 }
-.descubrimiento-cuerpo { padding: 12px 12px 14px; display: grid; gap: 4px; }
-.descubrimiento-cuerpo h2 { margin: 0; font-size: 1.05rem; }
-.descubrimiento-cuerpo p { margin: 0; color: #93a0b4; font-size: 0.88rem; }
+.descubrimiento-cuerpo { padding: 14px 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.descubrimiento-cuerpo h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.descubrimiento-cuerpo p { margin: 0; color: #93a0b4; font-size: 0.88rem; overflow-wrap: break-word; }
+@container pagina (max-width: 980px) {
+  .rejilla-descubrir { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container pagina (max-width: 640px) {
+  .rejilla-descubrir { grid-template-columns: minmax(0, 1fr); }
+}
 .descubrir-detalle {
   display: grid;
   grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
@@ -1250,6 +1268,11 @@ a { color: inherit; }
   color: #1c2430;
   border: 1px solid #d5deea;
 }
+.acceso.claro .acceso-globo::before {
+  background: #ffffff;
+  border-left-color: #d5deea;
+  border-top-color: #d5deea;
+}
 .acceso.claro .acceso-globo p { color: #5c6b80; }
 .acceso-panel {
   display: flex;
@@ -1982,7 +2005,10 @@ a { color: inherit; }
 .claro .curso-textos small, .claro .grupo-nav p, .claro .enlace small, .claro .cerrar-sesion, .claro .curso-contraer { color: #6b7789; }
 .claro .enlace { color: #1c2430; }
 .claro .enlace:hover { background: rgba(47, 124, 246, 0.08); }
-.claro .enlace.activo, .claro .enlace.activo small { color: white; }
+.claro .enlace.activo,
+.claro .enlace.activo:hover { background: #2f7cf6; color: white; }
+.claro .enlace.activo small,
+.claro .enlace.activo:hover small { color: rgba(255, 255, 255, 0.86); }
 .contenido { background: var(--fondo); color: var(--texto); }
 .claro .contenido { background: #f5f7fb; color: #1c2430; }
 .claro .panel, .claro .editor-lateral, .claro .fila-pregunta, .claro .vista-pregunta, .claro .descubrir-ficha, .claro .conjunto-menu {
@@ -1999,9 +2025,17 @@ a { color: inherit; }
 .claro .banner p { color: #3d4d63; }
 .claro .aviso { background: #fff6e4; color: #8a5a10; border-color: #f3d7a1; }
 .claro .conjunto, .claro .descubrimiento, .claro .tarjeta { color: #1c2430; }
-.claro .acento-azul.conjunto, .claro .acento-azul.descubrimiento, .claro .acento-azul.tarjeta { background: #eef3ff; border-color: #b9d0ff; }
-.claro .acento-naranja.conjunto, .claro .acento-naranja.descubrimiento, .claro .acento-naranja.tarjeta { background: #fff6e0; border-color: #f3d48a; }
-.claro .acento-verde.conjunto, .claro .acento-verde.descubrimiento, .claro .acento-verde.tarjeta { background: #e9f8ef; border-color: #b7ebc9; }
+.claro .acento-azul.conjunto, .claro .acento-azul.tarjeta { background: #eef3ff; border-color: #b9d0ff; }
+.claro .acento-naranja.conjunto, .claro .acento-naranja.tarjeta { background: #fff6e0; border-color: #f3d48a; }
+.claro .acento-verde.conjunto, .claro .acento-verde.tarjeta { background: #e9f8ef; border-color: #b7ebc9; }
+.claro .descubrimiento {
+  background: #ffffff;
+  border: 1px solid #e6e8ee;
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.06);
+}
+.claro .descubrimiento.acento-azul { border-top: 3px solid #2563eb; }
+.claro .descubrimiento.acento-naranja { border-top: 3px solid #b45309; }
+.claro .descubrimiento.acento-verde { border-top: 3px solid #047857; }
 .claro .conjunto-fecha, .claro .descubrimiento-cuerpo p, .claro .meta, .claro .editor-lateral p { color: #5c6b80; }
 .claro .conjunto-iconos a, .claro .conjunto-iconos > button, .claro .conjunto-mas > button, .claro .conjunto-solo { color: #243041; }
 .claro .conjunto-iconos { border-top-color: rgba(28, 36, 48, 0.08); }
@@ -2227,6 +2261,19 @@ a { color: inherit; }
 .aplicacion.claro .perfil-form input {
   background: var(--perfil-input);
 }
+.aplicacion.claro .perfil-badge.estudiante {
+  color: #0c7a5c;
+  background: rgba(16, 215, 161, 0.16);
+}
+.aplicacion.claro .perfil-badge.profe {
+  color: #5b21b6;
+  background: rgba(139, 92, 246, 0.14);
+}
+.aplicacion.claro .perfil-dialogo,
+.aplicacion.claro .perfil-menu-lista {
+  background: #ffffff;
+  color: #1c2430;
+}
 .perfil-pagina h1, .perfil-pagina h2, .perfil-pagina h3, .perfil-pagina p { color: inherit; }
 .perfil-pagina h2, .perfil-pagina h3 { margin: 0; }
 .perfil-encabezado {
@@ -2382,8 +2429,8 @@ a { color: inherit; }
 .perfil-dato small, .perfil-metrica small { display: block; color: var(--perfil-suave); font-size: 0.78rem; line-height: 1.3; }
 .perfil-dato strong, .perfil-metrica strong {
   display: block;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   margin-top: 4px;
 }
 .perfil-github {
@@ -2394,10 +2441,11 @@ a { color: inherit; }
   padding: 0 12px;
   border-radius: 12px;
   border: 1px solid var(--perfil-borde);
-  background: #0a1020;
-  color: var(--perfil-suave);
+  background: var(--perfil-superficie);
+  color: var(--perfil-texto);
   overflow-wrap: anywhere;
 }
+.perfil-github.vacio { color: var(--perfil-suave); }
 .perfil-metricas {
   margin-top: 16px;
   display: grid;

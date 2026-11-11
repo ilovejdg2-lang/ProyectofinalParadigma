@@ -7,7 +7,7 @@ import { mensajeDe } from '../dominio/errores.ts'
 import type { BorradorCuestionario, BorradorPregunta, Dificultad } from '../dominio/tipos.ts'
 import { validarCuestionario } from '../dominio/validacion.ts'
 
-const categorias = ['Kanban', 'Paradigma funcional', 'Paradigma lógico', 'Orientado a objetos', 'Concurrente', 'General']
+const categorias = ['Arquitecturas', 'Liderazgo', 'SQL', 'General']
 
 function esVerdaderoFalso(opciones: Array<{ texto: string }>) {
   if (opciones.length !== 2) return false
