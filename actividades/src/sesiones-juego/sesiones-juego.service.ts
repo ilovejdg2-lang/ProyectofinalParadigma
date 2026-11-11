@@ -68,6 +68,8 @@ const arbol = {
 interface CuestionarioJuego {
   id: string;
   titulo: string;
+  autorId?: string;
+  publico?: boolean;
   eliminadoEn: Date | null;
   preguntas: FilaPregunta[];
 }
@@ -96,6 +98,7 @@ export class SesionesJuegoService implements OnModuleDestroy {
     config?: ConfiguracionAcademica,
   ): Promise<SalaPublica> {
     const cuestionario = await this.cuestionarioJugable(cuestionarioId);
+    this.exigirVisible(cuestionario, identidad);
     const academica = await this.prepararAcademica(config, identidad, cuestionario.titulo);
     for (let intento = 0; intento < INTENTOS_CODIGO; intento += 1) {
       try {
@@ -853,6 +856,14 @@ export class SesionesJuegoService implements OnModuleDestroy {
     }
     jugables(fila.preguntas);
     return fila;
+  }
+
+  private exigirVisible(cuestionario: CuestionarioJuego, identidad: IdentidadExterna): void {
+    if (cuestionario.publico === false && cuestionario.autorId && cuestionario.autorId !== identidad.id) {
+      throw new ForbiddenException({
+        mensaje: 'Este cuestionario es privado.',
+      });
+    }
   }
 
   private async buscar(codigo: string): Promise<FilaSesion & { id: string }> {

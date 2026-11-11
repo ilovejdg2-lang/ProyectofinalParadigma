@@ -17,6 +17,7 @@ interface CuestionarioFila {
   etiquetas: string[];
   dificultad: 'facil' | 'medio' | 'dificil';
   esDemostracion: boolean;
+  publico?: boolean;
   imagenId: string | null;
   creadoEn: Date;
   actualizadoEn: Date;
@@ -91,7 +92,7 @@ export class PrismaMemoria {
     findMany: async ({
       where,
     }: {
-      where: { eliminadoEn: null; autorId?: string };
+      where: { eliminadoEn: null; autorId?: string; publico?: boolean };
     }) => this.filtrarCuestionarios(where).map((fila) => this.arbol(fila)),
     findFirst: async ({
       where,
@@ -106,11 +107,12 @@ export class PrismaMemoria {
     }: {
       data: Omit<
         CuestionarioFila,
-        'creadoEn' | 'actualizadoEn' | 'eliminadoEn'
-      >;
+        'creadoEn' | 'actualizadoEn' | 'eliminadoEn' | 'publico'
+      > & { publico?: boolean };
     }) => {
       const fila: CuestionarioFila = {
         ...data,
+        publico: data.publico !== false,
         creadoEn: new Date(),
         actualizadoEn: new Date(),
         eliminadoEn: null,
@@ -229,12 +231,14 @@ export class PrismaMemoria {
     id?: string;
     autorId?: string;
     eliminadoEn?: null;
+    publico?: boolean;
   }): CuestionarioFila[] {
     return this.cuestionarios
       .filter((fila) => {
         if (where.id && fila.id !== where.id) return false;
         if (where.autorId && fila.autorId !== where.autorId) return false;
         if (where.eliminadoEn === null && fila.eliminadoEn) return false;
+        if (where.publico === true && fila.publico === false) return false;
         return true;
       })
       .sort(

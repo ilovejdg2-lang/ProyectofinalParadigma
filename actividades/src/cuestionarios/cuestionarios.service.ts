@@ -72,7 +72,7 @@ export class CuestionariosService {
 
   async listar(filtros: FiltrosCatalogoDto): Promise<CuestionarioPublico[]> {
     const filas = await this.db().cuestionario.findMany({
-      where: { eliminadoEn: null },
+      where: { eliminadoEn: null, publico: true },
       include: arbol,
       orderBy: [{ actualizadoEn: 'desc' }, { id: 'asc' }],
     });
@@ -90,6 +90,11 @@ export class CuestionariosService {
     const completo = Boolean(
       identidad && esMismoAutor(fila.autorId, identidad.id),
     );
+    if (fila.publico === false && !completo) {
+      throw new NotFoundException({
+        mensaje: 'No se encontró el cuestionario.',
+      });
+    }
     return presentar(fila, completo);
   }
 
@@ -139,6 +144,7 @@ export class CuestionariosService {
           etiquetas: etiquetasDe(preparada),
           dificultad: preparada.dificultad,
           esDemostracion: false,
+          publico: preparada.publico !== false,
           puntosPorAcierto: puntosPorAciertoDe(preparada.puntosPorAcierto),
           imagenId,
         },
@@ -171,6 +177,9 @@ export class CuestionariosService {
           categoria: preparada.categoria.trim(),
           etiquetas: etiquetasDe(preparada),
           dificultad: preparada.dificultad,
+          ...(typeof preparada.publico === 'boolean'
+            ? { publico: preparada.publico }
+            : {}),
           puntosPorAcierto: puntosPorAciertoDe(preparada.puntosPorAcierto),
           imagenId,
         },

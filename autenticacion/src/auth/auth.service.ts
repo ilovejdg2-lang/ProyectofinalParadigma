@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -12,7 +13,7 @@ import * as crypto from 'node:crypto';
 import { AlmacenUsuarios, RefreshTokenEntidad, UsuarioEntidad } from '../almacen/almacen-usuarios';
 import { KeysService } from '../crypto/keys.service';
 import { normalizarEmail, resolverRolYPolitica } from '../dominio/politica-dominio';
-import { PerfilPublico, TokensRespuesta } from '../dominio/tipos';
+import { PerfilPublico, RegistroPendiente, TokensRespuesta } from '../dominio/tipos';
 import {
   ActualizarPerfilDto,
   CambiarPasswordDto,
@@ -71,7 +72,7 @@ export class AuthService {
     };
   }
 
-  async registrar(datos: RegistroDto, ip?: string): Promise<TokensRespuesta> {
+  async registrar(datos: RegistroDto, ip?: string): Promise<TokensRespuesta | RegistroPendiente> {
     const nombre = extraerNombreRegistro(datos);
     const email = extraerEmailRegistro(datos);
     const password = extraerPasswordRegistro(datos);
@@ -93,6 +94,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, salt);
 
     const rolElegido = extraerRolRegistro(datos);
+    const esperaAdmin = rolElegido === 'teacher';
     const usuario = await this.almacen.crearUsuario({
       email,
       passwordHash,
@@ -100,8 +102,19 @@ export class AuthService {
       role: rolElegido ?? resultadoPolitica.rol,
       emailVerified: resultadoPolitica.emailVerificado,
       institutionId: resultadoPolitica.institutionId ?? null,
-      status: resultadoPolitica.requiereVerificacion ? 'PendingVerification' : 'Active',
+      status: esperaAdmin
+        ? 'PendingApproval'
+        : resultadoPolitica.requiereVerificacion
+          ? 'PendingVerification'
+          : 'Active',
     });
+
+    if (esperaAdmin) {
+      return {
+        pendiente: true,
+        mensaje: 'Tu cuenta de profesor quedó creada. Un administrador tiene que aceptarla antes de que puedas entrar.',
+      };
+    }
 
     if (resultadoPolitica.requiereVerificacion) {
       const tokenVerif = this.generarTokenOpaco();
@@ -134,6 +147,9 @@ export class AuthService {
 
     if (usuario.status === 'Locked') {
       throw new UnauthorizedException('La cuenta está bloqueada.');
+    }
+    if (usuario.status === 'PendingApproval') {
+      throw new UnauthorizedException('Tu cuenta de profesor espera la aceptación de un administrador.');
     }
 
     return this.emitirTokens(usuario, ip);
@@ -174,7 +190,7 @@ export class AuthService {
     }
 
     const usuario = await this.almacen.buscarPorId(tokenEntidad.userId);
-    if (!usuario || usuario.status === 'Locked') {
+    if (!usuario || usuario.status === 'Locked' || usuario.status === 'PendingApproval') {
       throw new UnauthorizedException('La sesión no es válida.');
     }
 
@@ -229,9 +245,10 @@ export class AuthService {
     }
 
     await this.almacen.marcarVerificationTokenUsado(entidad.id);
+    const dueno = await this.almacen.buscarPorId(entidad.userId);
     await this.almacen.actualizarUsuario(entidad.userId, {
       emailVerified: true,
-      status: 'Active',
+      status: dueno?.status === 'PendingApproval' ? 'PendingApproval' : 'Active',
     });
 
     return { mensaje: 'Correo electrónico verificado exitosamente.' };
@@ -342,6 +359,26 @@ export class AuthService {
 
     this.logger.log(`Contraseña restablecida para ${usuario.email}. Sesiones anteriores revocadas.`);
     return { mensaje: 'Contraseña actualizada. Ya puedes iniciar sesión.' };
+  }
+
+  async listarProfesoresPendientes(rol?: string): Promise<PerfilPublico[]> {
+    if (rol !== 'admin') {
+      throw new ForbiddenException({ mensaje: 'Solo un administrador puede ver las solicitudes.' });
+    }
+    const pendientes = await this.almacen.listarProfesoresPendientes();
+    return pendientes.map((usuario) => this.formatearPerfil(usuario));
+  }
+
+  async aceptarProfesor(rol: string | undefined, id: string): Promise<PerfilPublico> {
+    if (rol !== 'admin') {
+      throw new ForbiddenException({ mensaje: 'Solo un administrador puede aceptar profesores.' });
+    }
+    const usuario = await this.almacen.buscarPorId(id);
+    if (!usuario || usuario.role !== 'teacher' || usuario.status !== 'PendingApproval') {
+      throw new NotFoundException({ mensaje: 'No hay una solicitud de profesor con ese identificador.' });
+    }
+    const aceptado = await this.almacen.actualizarUsuario(id, { status: 'Active' });
+    return this.formatearPerfil(aceptado);
   }
 
   private async emitirTokens(usuario: UsuarioEntidad, ip?: string): Promise<TokensRespuesta> {

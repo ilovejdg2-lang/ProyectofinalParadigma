@@ -15,6 +15,7 @@ export interface EntradaCuestionario {
   modo?: Cuestionario['modo']
   imagenUrl?: string
   puntosPorAcierto?: number
+  publico?: boolean
   preguntas: Pregunta[]
 }
 
@@ -71,11 +72,18 @@ export function crearActividadesSimuladas(
 ): ClienteActividades {
   return {
     async listar() {
-      return leer(almacen)
+      return leer(almacen).filter((item) => item.publico !== false)
     },
     async obtener(id) {
       const cuestionario = leer(almacen).find((item) => item.id === id)
       if (!cuestionario) throw new ErrorServicio('no-encontrado', 'No se encontró el cuestionario.')
+      if (cuestionario.publico === false) {
+        const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('profelink.token') : null
+        const sesion = token ? await autenticacion.sesionActual(token) : null
+        if (!sesion || sesion.perfil.id !== cuestionario.autorId) {
+          throw new ErrorServicio('no-encontrado', 'No se encontró el cuestionario.')
+        }
+      }
       return cuestionario
     },
     async mios(token) {
@@ -100,6 +108,7 @@ export function crearActividadesSimuladas(
           categoria: entrada.categoria,
           etiquetas: entrada.etiquetas,
           dificultad: entrada.dificultad,
+          publico: entrada.publico ?? actual.publico ?? true,
           modo: entrada.modo ?? actual.modo ?? 'en-vivo',
           imagenUrl: entrada.imagenUrl,
           preguntas: entrada.preguntas,
@@ -120,6 +129,7 @@ export function crearActividadesSimuladas(
         categoria: entrada.categoria,
         etiquetas: entrada.etiquetas,
         dificultad: entrada.dificultad,
+        publico: entrada.publico !== false,
         modo: entrada.modo ?? 'en-vivo',
         autorId: perfil.id,
         autorNombre: perfil.nombre,

@@ -130,6 +130,14 @@ export class EntradaCuestionarioDto {
   @Max(100)
   puntosPorAcierto?: number;
 
+  @ApiPropertyOptional({
+    description: 'Si es false, el cuestionario no aparece en el catálogo.',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  publico?: boolean;
+
   @ApiProperty({ type: () => PreguntaDto, isArray: true })
   @IsArray()
   @ValidateNested({ each: true })

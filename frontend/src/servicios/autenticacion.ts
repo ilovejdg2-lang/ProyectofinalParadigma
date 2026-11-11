@@ -15,8 +15,21 @@ export interface SolicitudRecuperacion {
   codigo?: string
 }
 
+export interface RegistroPendiente {
+  pendiente: true
+  mensaje: string
+}
+
+export interface SolicitudProfesor {
+  id: string
+  nombre: string
+  correo: string
+}
+
 export interface ClienteAutenticacion {
-  registrar(datos: RegistroPerfil): Promise<Sesion>
+  registrar(datos: RegistroPerfil): Promise<Sesion | RegistroPendiente>
+  listarProfesoresPendientes(token: string): Promise<SolicitudProfesor[]>
+  aceptarProfesor(token: string, id: string): Promise<void>
   iniciarSesion(correo: string, contrasena: string): Promise<Sesion>
   cerrarSesion(token: string): Promise<void>
   sesionActual(token: string): Promise<Sesion | null>
@@ -28,6 +41,7 @@ export interface ClienteAutenticacion {
 
 interface UsuarioGuardado extends Perfil {
   contrasena: string
+  estado?: 'pendiente' | 'activo'
 }
 
 interface EstadoAuth {
@@ -91,10 +105,18 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
         correo,
         contrasena: datos.contrasena,
         rol: datos.rol ?? (correo.endsWith('@una.cr') ? 'teacher' : 'student'),
+        estado: datos.rol === 'teacher' ? 'pendiente' : 'activo',
         creadoEn: new Date().toISOString(),
       }
-      const token = crearId()
       estado.usuarios.push(usuario)
+      if (usuario.estado === 'pendiente') {
+        guardar(almacen, estado)
+        return {
+          pendiente: true,
+          mensaje: 'Tu cuenta de profesor quedó creada. Un administrador tiene que aceptarla antes de que puedas entrar.',
+        }
+      }
+      const token = crearId()
       estado.sesiones.push({ token, perfilId: usuario.id })
       guardar(almacen, estado)
       return sesionDe(estado, token)!
@@ -104,6 +126,9 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
       const usuario = estado.usuarios.find((item) => item.correo === correo.trim().toLowerCase())
       if (!usuario || usuario.contrasena !== contrasena) {
         throw new ErrorServicio('credenciales', 'Correo o contraseña incorrectos.')
+      }
+      if (usuario.estado === 'pendiente') {
+        throw new ErrorServicio('credenciales', 'Tu cuenta de profesor espera la aceptación de un administrador.')
       }
       const token = crearId()
       estado.sesiones.push({ token, perfilId: usuario.id })
@@ -141,6 +166,24 @@ export function crearAutenticacionSimulada(almacen: Almacen): ClienteAutenticaci
       usuario.nombre = limpio
       guardar(almacen, estado)
       return { token, perfil: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol, creadoEn: usuario.creadoEn } }
+    },
+    async listarProfesoresPendientes(token) {
+      const sesion = sesionDe(leer(almacen), token)
+      if (!sesion) throw new ErrorServicio('permiso', 'La sesión no es válida.')
+      if (sesion.perfil.rol !== 'admin') throw new ErrorServicio('permiso', 'Solo un administrador puede ver las solicitudes.')
+      return leer(almacen).usuarios
+        .filter((usuario) => usuario.rol === 'teacher' && usuario.estado === 'pendiente')
+        .map((usuario) => ({ id: usuario.id, nombre: usuario.nombre, correo: usuario.correo }))
+    },
+    async aceptarProfesor(token, id) {
+      const sesion = sesionDe(leer(almacen), token)
+      if (!sesion) throw new ErrorServicio('permiso', 'La sesión no es válida.')
+      if (sesion.perfil.rol !== 'admin') throw new ErrorServicio('permiso', 'Solo un administrador puede aceptar profesores.')
+      const estado = leer(almacen)
+      const usuario = estado.usuarios.find((item) => item.id === id && item.estado === 'pendiente')
+      if (!usuario) throw new ErrorServicio('no-encontrado', 'No hay una solicitud de profesor con ese identificador.')
+      usuario.estado = 'activo'
+      guardar(almacen, estado)
     },
     async solicitarRecuperacion(correo) {
       const estado = leer(almacen)
@@ -208,7 +251,22 @@ export function crearAutenticacionHttp(baseUrl: string): ClienteAutenticacion {
         body: JSON.stringify(datos),
       })
       if (!respuesta.ok) throw new ErrorServicio('validacion', await leerMensaje(respuesta))
-      return (await respuesta.json()) as Sesion
+      const cuerpo = (await respuesta.json()) as Sesion | RegistroPendiente
+      return cuerpo
+    },
+    async listarProfesoresPendientes(token) {
+      const respuesta = await fetch(`${raiz}/profesores/pendientes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!respuesta.ok) throw new ErrorServicio('permiso', await leerMensaje(respuesta))
+      return (await respuesta.json()) as SolicitudProfesor[]
+    },
+    async aceptarProfesor(token, id) {
+      const respuesta = await fetch(`${raiz}/profesores/${id}/aceptar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!respuesta.ok) throw new ErrorServicio('permiso', await leerMensaje(respuesta))
     },
     async iniciarSesion(correo, contrasena) {
       let respuesta: Response

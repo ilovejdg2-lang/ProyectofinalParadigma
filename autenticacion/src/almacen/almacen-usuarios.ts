@@ -43,6 +43,7 @@ export abstract class AlmacenUsuarios {
   abstract buscarPorId(id: string): Promise<UsuarioEntidad | null>;
   abstract crearUsuario(datos: Omit<UsuarioEntidad, 'id' | 'createdAt' | 'updatedAt'>): Promise<UsuarioEntidad>;
   abstract actualizarUsuario(id: string, datos: Partial<UsuarioEntidad>): Promise<UsuarioEntidad>;
+  abstract listarProfesoresPendientes(): Promise<UsuarioEntidad[]>;
   abstract listarPoliticas(): Promise<EntidadPoliticaDominio[]>;
   abstract guardarRefreshToken(token: RefreshTokenEntidad): Promise<void>;
   abstract buscarRefreshToken(tokenHash: string): Promise<RefreshTokenEntidad | null>;
@@ -190,6 +191,12 @@ export class AlmacenUsuariosMemoria extends AlmacenUsuarios implements OnModuleI
     };
     this.usuarios.set(actualizado.email, actualizado);
     return actualizado;
+  }
+
+  async listarProfesoresPendientes(): Promise<UsuarioEntidad[]> {
+    return [...this.usuarios.values()].filter(
+      (usuario) => usuario.role === 'teacher' && usuario.status === 'PendingApproval',
+    );
   }
 
   async listarPoliticas(): Promise<EntidadPoliticaDominio[]> {

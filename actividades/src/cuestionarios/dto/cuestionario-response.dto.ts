@@ -70,6 +70,9 @@ export class CuestionarioResponseDto {
   @ApiProperty()
   esDemostracion!: boolean;
 
+  @ApiProperty({ description: 'False cuando solo lo ve quien lo creó.' })
+  publico!: boolean;
+
   @ApiProperty({ format: 'date-time' })
   actualizadoEn!: string;
 }

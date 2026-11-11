@@ -41,6 +41,7 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
   const [verContrasena, setVerContrasena] = useState(false)
   const [rol, setRol] = useState<'teacher' | 'student' | ''>('')
   const [errores, setErrores] = useState<string[]>([])
+  const [aviso, setAviso] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [recuperar, setRecuperar] = useState(false)
   const [tema, setTema] = useState<Tema>(() => leerTema())
@@ -68,6 +69,10 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
       const sesion = registro
         ? await autenticacion.registrar({ nombre, correo, contrasena, rol: rol || undefined })
         : await autenticacion.iniciarSesion(correo, contrasena)
+      if ('pendiente' in sesion) {
+        setAviso(sesion.mensaje)
+        return
+      }
       limpiarEspacio()
       entrar(sesion)
       navegar(esEntradaDirecta(destino) ? destino : '/elegir', { replace: true })
@@ -150,8 +155,12 @@ function FormularioAcceso({ registro }: { registro: boolean }) {
                   Estudiante
                 </button>
               </div>
+              {rol === 'teacher' ? (
+                <p className="aviso">Un administrador tiene que aceptar la cuenta antes de que puedas entrar.</p>
+              ) : null}
             </fieldset>
           )}
+          {aviso ? <p className="aviso" role="status">{aviso}</p> : null}
           {errores.length > 0 ? (
             <ul className="lista-errores acceso-errores">
               {errores.map((error) => (

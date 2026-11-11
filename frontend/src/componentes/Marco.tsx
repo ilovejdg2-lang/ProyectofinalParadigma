@@ -67,7 +67,10 @@ export function Marco() {
   const espacio = leerEspacio()
   const esDocente = perfil?.rol === 'teacher' || perfil?.rol === 'admin'
   const rolEtiqueta = perfil?.rol === 'admin' ? 'Administrador' : esDocente ? 'Docente' : 'Estudiante'
-  const enlaces = espacio === 'cursos' ? curso : cuestionario
+  const enlacesBase = espacio === 'cursos' ? curso : cuestionario
+  const enlaces = perfil?.rol === 'admin'
+    ? [...enlacesBase, { to: '/solicitudes', etiqueta: 'Solicitudes', detalle: 'Profesores por aceptar', icono: 'persona', fin: false }]
+    : enlacesBase
   const enlacesProgreso = espacio === 'cursos' ? progresoCurso : progreso
   const inicio = espacio === 'cursos' ? '/cursos' : '/'
 

@@ -91,6 +91,7 @@ export function MisCuestionarios() {
             </div>
             <div className="conjunto-cuerpo">
               {cuestionario.esDemostracion ? <span className="etiqueta-demo">Datos de prueba</span> : null}
+              {cuestionario.publico === false ? <span className="etiqueta-privada">Privado</span> : null}
               <h2>{cuestionario.titulo}</h2>
               <p className="conjunto-dato">{etiquetaDificultad(cuestionario.dificultad)}</p>
               <p className="conjunto-fecha">{textoEditado(cuestionario.actualizadoEn)}</p>
