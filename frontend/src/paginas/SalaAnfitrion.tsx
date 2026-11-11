@@ -107,7 +107,7 @@ export function SalaAnfitrion() {
     const faseTexto =
       sala.estado === 'pregunta' ? 'Pregunta' : sala.estado === 'cerrada' ? 'Resultados' : sala.estado === 'clasificacion' ? 'Clasificación' : sala.estado === 'minijuego' ? 'Minijuego' : 'Podio'
     return (
-      <EscenarioPartida fase={faseTexto} preguntaActual={sala.preguntaActual} total={sala.preguntas.length} paisaje={paisaje} tension={tension} pie={
+      <EscenarioPartida fase={faseTexto} preguntaActual={sala.preguntaActual} total={sala.preguntas.length} paisaje={paisaje} tension={tension} codigo={sala.codigo} anfitrion={sala.anfitrionNombre} pie={
         <>
           {sala.estado === 'cerrada' ? (
             <button className="boton grande" type="button" disabled={ocupado} onClick={() => token && void accion(() => cliente.avanzar(token, sala.codigo, 'cerrada'))}>
@@ -177,7 +177,7 @@ export function SalaAnfitrion() {
               <p className="pastilla">{sala.titulo}</p>
               {sala.evaluacion ? <p className="pastilla">Evaluación · {sala.evaluacion.cursoNombre} · vale {sala.evaluacion.valorPorcentaje}%</p> : null}
               {sala.evaluacion ? <p>Solo entra quien pertenece a {sala.evaluacion.cursoNombre}.</p> : null}
-              <p>Comparte este código con tu grupo:</p>
+              <p>{sala.anfitrionNombre} · comparte este código. Sigue a la vista cuando la partida ya empezó.</p>
               <p className="pin-gigante" data-testid="codigo-sala">
                 {sala.codigo.split('').map((letra, indice) => (
                   <span key={`${sala.codigo}-${indice}`}>{letra}</span>

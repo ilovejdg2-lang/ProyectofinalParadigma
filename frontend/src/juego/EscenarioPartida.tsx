@@ -11,6 +11,8 @@ export function EscenarioPartida({
   total,
   paisaje,
   tension,
+  codigo,
+  anfitrion,
   children,
   pie,
 }: {
@@ -19,6 +21,8 @@ export function EscenarioPartida({
   total: number
   paisaje: Paisaje
   tension: boolean
+  codigo?: string
+  anfitrion?: string
   children: ReactNode
   pie?: ReactNode
 }) {
@@ -50,6 +54,12 @@ export function EscenarioPartida({
             {enPodio ? 'Partida terminada' : `Pregunta ${Math.min(total, preguntaActual + 1)} de ${total}`}
           </p>
           {!enPodio ? <p className="escenario-etiqueta">{fase}</p> : null}
+          {codigo ? (
+            <p className="escenario-codigo" data-testid="codigo-sala">
+              {anfitrion ? <span>{anfitrion}</span> : null}
+              <strong>{codigo}</strong>
+            </p>
+          ) : null}
         </div>
         {!enPodio ? (
           <div className="escenario-progreso" aria-hidden="true">

@@ -21,7 +21,12 @@ interface ClienteConectado {
   usuarioId?: string;
   nombre?: string;
   respondio: boolean;
+  fallos: number;
 }
+
+const INTERVALO_LATIDO_MS = 20_000;
+const FALLOS_PARA_CORTAR = 3;
+const GRACIA_AUSENCIA_MS = 8_000;
 
 @Injectable()
 export class CanalWebSocketService
@@ -32,6 +37,7 @@ export class CanalWebSocketService
   private salas = new Map<string, Set<ClienteConectado>>();
   private sesiones!: SesionesJuegoService;
   private latido: ReturnType<typeof setInterval> | null = null;
+  private ausencias = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -58,7 +64,7 @@ export class CanalWebSocketService
       },
     );
 
-    this.latido = setInterval(() => this.revisarLatido(), 5_000);
+    this.latido = setInterval(() => this.revisarLatido(), INTERVALO_LATIDO_MS);
     this.logger.log(
       'Canal WebSocket de ProfeLink montado en /canal y / con soporte de salas.',
     );
@@ -66,6 +72,8 @@ export class CanalWebSocketService
 
   onModuleDestroy() {
     if (this.latido) clearInterval(this.latido);
+    for (const espera of this.ausencias.values()) clearTimeout(espera);
+    this.ausencias.clear();
     this.wss?.close();
     this.salas.clear();
   }
@@ -75,11 +83,20 @@ export class CanalWebSocketService
       for (const cliente of clientes) {
         if (cliente.ws.readyState !== WebSocket.OPEN) continue;
         if (!cliente.respondio) {
-          cliente.ws.terminate();
-          continue;
+          cliente.fallos += 1;
+          if (cliente.fallos >= FALLOS_PARA_CORTAR) {
+            cliente.ws.terminate();
+            continue;
+          }
+        } else {
+          cliente.fallos = 0;
         }
         cliente.respondio = false;
-        cliente.ws.ping();
+        try {
+          cliente.ws.ping();
+        } catch {
+          /* El cierre de la sala limpia el socket. */
+        }
       }
     }
   }
@@ -164,10 +181,14 @@ export class CanalWebSocketService
       usuarioId: identidad?.id,
       nombre: identidad?.nombre,
       respondio: true,
+      fallos: 0,
     };
-    ws.on('pong', () => {
+    const vivo = () => {
       cliente.respondio = true;
-    });
+      cliente.fallos = 0;
+    };
+    ws.on('pong', vivo);
+    ws.on('message', vivo);
 
     if (codigo) {
       if (!this.salas.has(codigo)) {
@@ -192,7 +213,7 @@ export class CanalWebSocketService
         if (conjunto.size === 0) {
           this.salas.delete(codigo);
         }
-        if (!sigue) void this.presencia(codigo, cliente.usuarioId, false);
+        if (!sigue) this.programarAusencia(codigo, cliente.usuarioId);
         this.logger.log(`Cliente desconectado de sala [${codigo}]`);
       }
     });
@@ -217,11 +238,36 @@ export class CanalWebSocketService
     return [...(this.salas.get(codigo.trim().toUpperCase()) ?? [])];
   }
 
+  private programarAusencia(codigo: string, perfilId: string | undefined): void {
+    if (!perfilId) return;
+    const clave = `${codigo}:${perfilId}`;
+    if (this.ausencias.has(clave)) return;
+    const espera = setTimeout(() => {
+      this.ausencias.delete(clave);
+      const conjunto = this.salas.get(codigo);
+      const sigue = conjunto
+        ? [...conjunto].some(
+            (item) =>
+              item.usuarioId === perfilId && item.ws.readyState === WebSocket.OPEN,
+          )
+        : false;
+      if (!sigue) void this.presencia(codigo, perfilId, false);
+    }, GRACIA_AUSENCIA_MS);
+    this.ausencias.set(clave, espera);
+  }
+
   private async presencia(
     codigo: string,
     perfilId: string | undefined,
     conectado: boolean,
   ): Promise<void> {
+    if (conectado && perfilId) {
+      const espera = this.ausencias.get(`${codigo}:${perfilId}`);
+      if (espera) {
+        clearTimeout(espera);
+        this.ausencias.delete(`${codigo}:${perfilId}`);
+      }
+    }
     if (!perfilId) return;
     const marcar = this.sesiones.marcarPresencia;
     if (typeof marcar !== 'function') return;
