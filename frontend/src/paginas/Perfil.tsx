@@ -158,7 +158,7 @@ export function Perfil() {
             </div>
           </div>
           <div className="perfil-datos">
-            <Dato icono={<Mail size={16} aria-hidden="true" />} etiqueta="Correo institucional" valor={perfil.correo} />
+            <Dato icono={<Mail size={16} aria-hidden="true" />} etiqueta="Correo institucional" valor={correoLegible(perfil.correo)} />
             <Dato icono={<IdCard size={16} aria-hidden="true" />} etiqueta="Cédula" valor="No registrada" />
             <Dato
               icono={<CalendarDays size={16} aria-hidden="true" />}
@@ -178,7 +178,7 @@ export function Perfil() {
           </section>
           <section className="perfil-card">
             <h2><span className="perfil-ico gris"><GitBranch size={18} aria-hidden="true" /></span> GitHub</h2>
-            <p className="perfil-github">{githubActual || 'No configurado'}</p>
+            <p className={githubActual ? 'perfil-github' : 'perfil-github vacio'}>{githubActual || 'No configurado'}</p>
             <button className="perfil-boton-suave" type="button" onClick={() => setGithub(true)}>
               <Pencil size={15} aria-hidden="true" /> Editar GitHub
             </button>
@@ -368,7 +368,19 @@ export function Perfil() {
   )
 }
 
-function Dato({ icono, etiqueta, valor }: { icono: ReactNode; etiqueta: string; valor: string }) {
+function correoLegible(correo: string) {
+  const corte = correo.indexOf('@')
+  if (corte < 1) return correo
+  return (
+    <>
+      {correo.slice(0, corte)}
+      <wbr />
+      {correo.slice(corte)}
+    </>
+  )
+}
+
+function Dato({ icono, etiqueta, valor }: { icono: ReactNode; etiqueta: string; valor: ReactNode }) {
   return (
     <article className="perfil-dato">
       <span>{icono}</span>

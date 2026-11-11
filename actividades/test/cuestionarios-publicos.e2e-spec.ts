@@ -37,7 +37,7 @@ describe('Catálogo público en Supabase (e2e)', () => {
     expect(detalleCuerpo.preguntas).toHaveLength(4);
     expect(detalleCuerpo.preguntas[0].opciones).toHaveLength(4);
     expect(detalleCuerpo.preguntas[0].opciones[0].texto).toBe(
-      'Mismo resultado y sin cambiar estado externo',
+      'Muestra la interfaz y recibe la interacción',
     );
     expect(JSON.stringify(detalle.body)).not.toContain('"correcta"');
 

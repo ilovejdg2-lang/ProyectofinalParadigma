@@ -7,13 +7,12 @@ import { ProveedorServicios } from '../contexto/ProveedorServicios.tsx'
 import {
   CONTRASENA_DEMO,
   CORREO_DEMO,
-  MODOS_DEMOSTRACION,
   cuestionariosDemostracion,
-  preguntasKanbanAcademicas,
 } from '../datos/demostracion.ts'
 import { opcionesDe } from '../dominio/opciones.ts'
 import { filtrarCuestionarios } from '../dominio/filtros.ts'
 import { validarEntradaPartida, validarImagen } from '../dominio/validacion.ts'
+import type { Cuestionario } from '../dominio/tipos.ts'
 import { rutasAplicacion } from '../rutas/Rutas.tsx'
 import { almacenMemoria } from '../servicios/almacen.ts'
 import { crearServicios, type Servicios } from '../servicios/crearServicios.ts'
@@ -40,6 +39,45 @@ async function entrarDemo(servicios: Servicios) {
   sessionStorage.setItem('profelink.token', sesion.token)
   sessionStorage.setItem('profelink.espacio', 'cuestionarios')
   return sesion
+}
+
+function cuestionarioLocal(id: string): Cuestionario {
+  return {
+    id,
+    titulo: id === 'sql-local' ? 'Consulta SQL' : 'Cuestionario de prueba',
+    descripcion: 'Pregunta creada en la prueba',
+    categoria: 'General',
+    etiquetas: id === 'sql-local' ? ['sql'] : [],
+    dificultad: 'facil',
+    modo: 'en-vivo',
+    autorId: 'perfil-demo',
+    autorNombre: 'Docente de prueba',
+    esDemostracion: false,
+    actualizadoEn: '2026-10-18T12:00:00.000Z',
+    preguntas: [1, 2, 3, 4].map((orden) => ({
+      id: `${id}-p${orden}`,
+      orden,
+      enunciado: `Pregunta ${orden}`,
+      respuestaCorrecta: true,
+      opciones: [
+        { id: `${id}-p${orden}:si`, texto: `Respuesta ${orden}`, correcta: true },
+        { id: `${id}-p${orden}:no`, texto: `Otra ${orden}`, correcta: false },
+      ],
+    })),
+  }
+}
+
+async function guardarCuestionarioDePrueba(servicios: Servicios, token: string) {
+  const base = cuestionarioLocal('prueba')
+  return servicios.actividades.guardar(token, {
+    titulo: base.titulo,
+    descripcion: base.descripcion,
+    categoria: base.categoria,
+    etiquetas: base.etiquetas,
+    dificultad: base.dificultad,
+    modo: base.modo,
+    preguntas: base.preguntas,
+  })
 }
 
 describe('acceso', () => {
@@ -89,32 +127,17 @@ describe('acceso', () => {
 
 describe('cuestionarios', () => {
   it('filtra el catálogo por el texto buscado', () => {
-    const resultado = filtrarCuestionarios(cuestionariosDemostracion(), {
-      texto: 'Prolog',
+    const resultado = filtrarCuestionarios([cuestionarioLocal('sql-local'), cuestionarioLocal('otro')], {
+      texto: 'SQL',
       categoria: '',
       dificultad: '',
       autor: '',
     })
-    expect(resultado.map((item) => item.id)).toEqual(['demo-logico'])
+    expect(resultado.map((item) => item.id)).toEqual(['sql-local'])
   })
 
-  it('incluye preguntas académicas sobre Kanban y datos de demostración para todos los modos', () => {
-    const cuestionarios = cuestionariosDemostracion()
-    const kanban = filtrarCuestionarios(cuestionarios, {
-      texto: '',
-      categoria: 'Kanban',
-      dificultad: '',
-      autor: '',
-    })
-    expect(kanban.map((item) => item.id)).toEqual([
-      'demo-kanban-fundamentos',
-      'demo-kanban-metricas',
-      'demo-kanban-tablero',
-    ])
-    expect(preguntasKanbanAcademicas().length).toBeGreaterThanOrEqual(15)
-    for (const modo of MODOS_DEMOSTRACION) {
-      expect(cuestionarios.some((c) => c.modo === modo.id)).toBe(true)
-    }
+  it('no trae cuestionarios fijos en el código de demostración', () => {
+    expect(cuestionariosDemostracion()).toEqual([])
   })
 
   it('no guarda un cuestionario sin título ni respuesta correcta', async () => {
@@ -133,7 +156,7 @@ describe('cuestionarios', () => {
     const usuario = userEvent.setup()
     const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
     const sesion = await entrarDemo(servicios)
-    const cuestionario = cuestionariosDemostracion()[0]
+    const cuestionario = await guardarCuestionarioDePrueba(servicios, sesion.token)
     const pregunta = cuestionario.preguntas[0]
     const opcion = opcionesDe(pregunta)[0]
     const guardar = vi.spyOn(servicios.sala, 'guardarPartida')
@@ -166,18 +189,19 @@ describe('partida y resultados', () => {
     const usuario = userEvent.setup()
     const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
     const anfitrion = await entrarDemo(servicios)
+    const cuestionario = await guardarCuestionarioDePrueba(servicios, anfitrion.token)
     const estudiante = await servicios.autenticacion.registrar({
       nombre: 'Ana Estudiante',
       correo: 'ana@prueba.test',
       contrasena: 'Demo-2026',
     })
-    const sala = await servicios.sala.crear(anfitrion.token, 'demo-funcional')
+    const sala = await servicios.sala.crear(anfitrion.token, cuestionario.id)
     await servicios.sala.unirse(estudiante.token, sala.codigo)
     await servicios.sala.iniciar(anfitrion.token, sala.codigo)
     sessionStorage.setItem('profelink.token', estudiante.token)
     renderEn(`/partida/${sala.codigo}`, servicios)
 
-    const correcta = await screen.findByRole('button', { name: 'Mismo resultado y sin cambiar estado externo' }, { timeout: 6000 })
+    const correcta = await screen.findByRole('button', { name: 'Respuesta 1' }, { timeout: 6000 })
     await usuario.click(correcta)
     expect(await screen.findByText(/¡Correcto!|Respuesta enviada/)).toBeInTheDocument()
     await expect(servicios.sala.responder(estudiante.token, sala.codigo, false)).rejects.toThrow(/Ya enviaste|cerrada/)
@@ -210,51 +234,49 @@ describe('partida y resultados', () => {
       contrasena: 'Demo-2026',
     })
 
-    const cuestionarioKanban = await servicios.actividades.obtener('demo-kanban-fundamentos')
+    const docente = await servicios.autenticacion.iniciarSesion(CORREO_DEMO, CONTRASENA_DEMO)
+    const cuestionario = await guardarCuestionarioDePrueba(servicios, docente.token)
+    const [primera, segunda, tercera, cuarta] = cuestionario.preguntas
     expect(() =>
-      validarEntradaPartida(cuestionarioKanban, {
-        cuestionarioId: cuestionarioKanban.id,
+      validarEntradaPartida(cuestionario, {
+        cuestionarioId: cuestionario.id,
         respuestas: [
-          { preguntaId: 'k1', opcionId: 'k1:verdadero' },
-          { preguntaId: 'k1', opcionId: 'k1:falso' },
+          { preguntaId: primera.id, opcionId: primera.opciones![0].id },
+          { preguntaId: primera.id, opcionId: primera.opciones![1].id },
         ],
       }),
     ).toThrow(/No se permiten respuestas duplicadas/)
 
     const guardado = await servicios.sala.guardarPartida(estudiante.token, {
-      codigo: 'KANB99',
-      cuestionarioId: 'demo-kanban-fundamentos',
+      codigo: 'PARA99',
+      cuestionarioId: cuestionario.id,
       modo: 'practica',
-      respuestas: [
-        { preguntaId: 'k1', opcionId: 'k1:verdadero' },
-        { preguntaId: 'k2', opcionId: 'k2:falso' },
-        { preguntaId: 'k3', valor: true },
-        { preguntaId: 'k4', opcionId: 'k4:falso' },
-        { preguntaId: 'k5', opcionId: 'k5:verdadero' },
-        { preguntaId: 'k6', opcionId: 'k6:verdadero' },
-      ],
+      respuestas: [primera, segunda, tercera, cuarta].map((pregunta) => ({
+        preguntaId: pregunta.id,
+        opcionId: pregunta.opciones![0].id,
+      })),
     })
-    expect(guardado.participantes[0]?.puntaje).toBe(6)
+    expect(guardado.participantes[0]?.puntaje).toBe(4)
 
     await expect(
       servicios.sala.guardarPartida(otro.token, {
-        codigo: 'KANB99',
-        cuestionarioId: 'demo-kanban-fundamentos',
-        respuestas: [{ preguntaId: 'k1', opcionId: 'k1:verdadero' }],
+        codigo: 'PARA99',
+        cuestionarioId: cuestionario.id,
+        respuestas: [{ preguntaId: primera.id, opcionId: primera.opciones![0].id }],
       }),
     ).rejects.toThrow(/Ya existe una partida registrada/)
 
     const progreso = await servicios.sala.progreso(estudiante.token)
     expect(progreso.usuarioId).toBe(estudiante.perfil.id)
     expect(progreso.partidasJugadas).toBe(1)
-    expect(progreso.totalAciertos).toBe(6)
-    expect(progreso.dominioKanban.porcentajeDominio).toBe(100)
+    expect(progreso.totalAciertos).toBe(4)
   })
 
   it('muestra un QR que abre la partida con el código', async () => {
     const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
     const anfitrion = await entrarDemo(servicios)
-    const sala = await servicios.sala.crear(anfitrion.token, 'demo-funcional')
+    const cuestionario = await guardarCuestionarioDePrueba(servicios, anfitrion.token)
+    const sala = await servicios.sala.crear(anfitrion.token, cuestionario.id)
     renderEn(`/sala/${sala.codigo}`, servicios)
 
     const qr = await screen.findByTestId('codigo-qr')
@@ -267,7 +289,8 @@ describe('partida y resultados', () => {
     const usuario = userEvent.setup()
     const servicios = crearServicios({ almacen: almacenMemoria(), entorno: entornoSimulado() })
     const anfitrion = await servicios.autenticacion.iniciarSesion(CORREO_DEMO, CONTRASENA_DEMO)
-    const sala = await servicios.sala.crear(anfitrion.token, 'demo-funcional')
+    const cuestionario = await guardarCuestionarioDePrueba(servicios, anfitrion.token)
+    const sala = await servicios.sala.crear(anfitrion.token, cuestionario.id)
     const estudiante = await servicios.autenticacion.registrar({
       nombre: 'Ana Invitada',
       correo: 'ana.invitada@prueba.test',

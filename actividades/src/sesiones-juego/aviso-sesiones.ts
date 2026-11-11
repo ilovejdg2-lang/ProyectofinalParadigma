@@ -6,6 +6,8 @@ export type CambioSesion =
   | 'pregunta-cerrada'
   | 'clasificacion-mostrada'
   | 'pregunta-cambiada'
+  | 'minijuego-iniciado'
+  | 'minijuego-resuelto'
   | 'sesion-finalizada'
   | 'presencia-actualizada';
 

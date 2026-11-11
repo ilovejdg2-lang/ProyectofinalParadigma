@@ -25,6 +25,10 @@ export function ConfigurarSesion() {
   const [notaMaxima, setNotaMaxima] = useState(100)
   const [valor, setValor] = useState(10)
   const [notaMinima, setNotaMinima] = useState(70)
+  const [minijuegos, setMinijuegos] = useState(true)
+  const [cada, setCada] = useState(3)
+  const [duracion, setDuracion] = useState(8)
+  const [velocidad, setVelocidad] = useState(true)
   const [cursoNuevo, setCursoNuevo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -92,6 +96,12 @@ export function ConfigurarSesion() {
       notaMaxima,
       valorPorcentaje: modo === 'evaluacion' ? valor : undefined,
       notaMinima,
+      modalidad: modo === 'evaluacion' ? 'academico' : 'competitivo',
+      minijuegosActivos: minijuegos,
+      cadaPreguntas: cada,
+      duracionMinijuego: duracion,
+      velocidadActiva: modo === 'evaluacion' ? false : velocidad,
+      tiposMinijuego: ['cofres', 'ruleta', 'estrellas', 'memoria', 'bomba'],
     }
     const ventana = prepararPestanaSala()
     setCreando(true)
@@ -168,7 +178,7 @@ export function ConfigurarSesion() {
           <h2 id="titulo-nota">
             <ClipboardList aria-hidden="true" /> Configuración de calificación
           </h2>
-          <p>La nota usa el porcentaje de respuestas correctas. Los puntos del podio, que sí dependen de la velocidad, no cambian la calificación.</p>
+          <p>La nota usa solo las respuestas correctas. La velocidad y los minijuegos no cambian la calificación.</p>
           <label>
             Nombre de la evaluación
             <input value={nombre} onChange={(evento) => setNombre(evento.target.value)} maxLength={80} required />
@@ -202,11 +212,42 @@ export function ConfigurarSesion() {
         </section>
       ) : null}
 
+      <section className="configurar-notas" aria-labelledby="titulo-minijuegos">
+        <h2 id="titulo-minijuegos">Minijuegos</h2>
+        <p>
+          {modo === 'evaluacion'
+            ? 'En una evaluación son pausas recreativas. No suman ni restan puntos de la nota.'
+            : 'En la partida competitiva dan puntos, rachas y bonificación por responder rápido.'}
+        </p>
+        <label className="configurar-campo">
+          <span>Minijuegos activados</span>
+          <input type="checkbox" checked={minijuegos} onChange={(evento) => setMinijuegos(evento.target.checked)} />
+        </label>
+        <div className="configurar-par">
+          <label>
+            Cada cuántas preguntas
+            <input type="number" min={1} max={20} value={cada} disabled={!minijuegos} onChange={(evento) => setCada(Number(evento.target.value))} />
+          </label>
+          <label>
+            Duración (segundos)
+            <input type="number" min={5} max={20} value={duracion} disabled={!minijuegos} onChange={(evento) => setDuracion(Number(evento.target.value))} />
+          </label>
+        </div>
+        {modo === 'practica' ? (
+          <label className="configurar-campo">
+            <span>Bonificación por velocidad</span>
+            <input type="checkbox" checked={velocidad} onChange={(evento) => setVelocidad(evento.target.checked)} />
+          </label>
+        ) : null}
+      </section>
+
       <section className="configurar-resumen" aria-label="Opciones de la sesión">
         <h2>Opciones de la sesión</h2>
         <ul>
           <li>Cuestionario: {cuestionario.titulo}</li>
-          <li>Tipo: {modo === 'evaluacion' ? 'Evaluación calificada' : 'Partida de práctica'}</li>
+          <li>Tipo: {modo === 'evaluacion' ? 'Evaluación académica' : 'Competencia'}</li>
+          <li>Minijuegos: {minijuegos ? `sí, cada ${cada} preguntas` : 'no'}</li>
+          {modo === 'practica' ? <li>Velocidad: {velocidad ? 'suma puntos extra' : 'desactivada'}</li> : <li>Velocidad: no afecta la nota</li>}
           <li>Curso: {curso?.nombre ?? 'Ninguno'}</li>
           <li>Preguntas: {preguntas}</li>
           <li>Tiempo: el de cada pregunta, o 20 segundos</li>

@@ -1,0 +1,11 @@
+ALTER TYPE "EstadoSesion" ADD VALUE IF NOT EXISTS 'minijuego';
+
+ALTER TABLE "SesionJuego" ADD COLUMN IF NOT EXISTS "modalidad" VARCHAR(20) NOT NULL DEFAULT 'clasico';
+ALTER TABLE "SesionJuego" ADD COLUMN IF NOT EXISTS "minijuegosActivos" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "SesionJuego" ADD COLUMN IF NOT EXISTS "tiposMinijuego" TEXT[] NOT NULL DEFAULT ARRAY['cofres', 'ruleta', 'estrellas', 'memoria', 'bomba']::TEXT[];
+ALTER TABLE "SesionJuego" ADD COLUMN IF NOT EXISTS "cadaPreguntas" INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE "SesionJuego" ADD COLUMN IF NOT EXISTS "duracionMinijuego" INTEGER NOT NULL DEFAULT 8;
+ALTER TABLE "SesionJuego" ADD COLUMN IF NOT EXISTS "velocidadActiva" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "Participante" ADD COLUMN IF NOT EXISTS "puntosMinijuegos" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Participante" ADD COLUMN IF NOT EXISTS "bonificacionVelocidad" INTEGER NOT NULL DEFAULT 0;

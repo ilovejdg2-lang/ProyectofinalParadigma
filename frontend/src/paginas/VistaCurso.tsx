@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAutenticacion } from '../contexto/ProveedorAutenticacion.tsx'
+import { useServicios } from '../contexto/ProveedorServicios.tsx'
+import { mensajeDe } from '../dominio/errores.ts'
+import type { Cuestionario } from '../dominio/tipos.ts'
 import { evaluacionesDelCurso, type EvaluacionCurso } from '../servicios/cursos.ts'
 import {
   ACTIVIDADES_CURSO,
   COLUMNAS_CURSO,
-  MATERIALES_CURSO,
   type ActividadCurso,
 } from './cursoDatos.ts'
 import { PortadaCurso } from './PortadaCurso.tsx'
@@ -94,21 +96,46 @@ export function VistaCurso() {
         </section>
       ) : null}
 
-      {pestana === 'materiales' ? (
-        <section className="curso-panel-simple" aria-labelledby="titulo-materiales">
-          <h2 id="titulo-materiales">Materiales</h2>
-          <div className="curso-materiales">
-            {MATERIALES_CURSO.map((item) => (
-              <article key={item.id}>
-                <h3>{item.titulo}</h3>
-                <p>{item.detalle}</p>
-                <Link to={`/cuestionarios/${item.id}`}>Abrir material</Link>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {pestana === 'materiales' ? <MaterialesCurso /> : null}
     </div>
+  )
+}
+
+function MaterialesCurso() {
+  const { actividades } = useServicios()
+  const [materiales, setMateriales] = useState<Cuestionario[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let activo = true
+    actividades
+      .listar()
+      .then((lista) => {
+        if (activo) setMateriales(lista)
+      })
+      .catch((err: unknown) => {
+        if (activo) setError(mensajeDe(err))
+      })
+    return () => {
+      activo = false
+    }
+  }, [actividades])
+
+  return (
+    <section className="curso-panel-simple" aria-labelledby="titulo-materiales">
+      <h2 id="titulo-materiales">Materiales</h2>
+      {error ? <p>{error}</p> : null}
+      {!error && materiales.length === 0 ? <p>Los materiales del curso aparecen aquí cuando están en la base.</p> : null}
+      <div className="curso-materiales">
+        {materiales.map((item) => (
+          <article key={item.id}>
+            <h3>{item.titulo}</h3>
+            <p>{item.descripcion}</p>
+            <Link to={`/cuestionarios/${item.id}`}>Abrir material</Link>
+          </article>
+        ))}
+      </div>
+    </section>
   )
 }
 

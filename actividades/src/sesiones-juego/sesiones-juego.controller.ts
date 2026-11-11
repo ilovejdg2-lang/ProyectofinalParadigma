@@ -12,6 +12,7 @@ import { IdentidadGuard } from '../autenticacion/identidad.guard';
 import type { IdentidadExterna } from '../autenticacion/identidad-externa';
 import { AvanzarDto } from './dto/avanzar.dto';
 import { CrearSesionDto } from './dto/crear-sesion.dto';
+import { JugarMinijuegoDto } from './dto/jugar-minijuego.dto';
 import { ResponderDto } from './dto/responder.dto';
 import { SesionesJuegoService } from './sesiones-juego.service';
 
@@ -41,6 +42,12 @@ export class SesionesJuegoController {
       notaMaxima: entrada.notaMaxima,
       valorPorcentaje: entrada.valorPorcentaje,
       notaMinima: entrada.notaMinima,
+      modalidad: entrada.modalidad,
+      minijuegosActivos: entrada.minijuegosActivos,
+      tiposMinijuego: entrada.tiposMinijuego,
+      cadaPreguntas: entrada.cadaPreguntas,
+      duracionMinijuego: entrada.duracionMinijuego,
+      velocidadActiva: entrada.velocidadActiva,
     });
   }
 
@@ -99,5 +106,15 @@ export class SesionesJuegoController {
     @IdentidadActual() identidad: IdentidadExterna,
   ) {
     return this.sesiones.avanzar(codigo, identidad, entrada.desde);
+  }
+
+  @Post('sesiones-juego/:codigo/minijuego')
+  @UseGuards(IdentidadGuard)
+  minijuego(
+    @Param('codigo') codigo: string,
+    @Body() entrada: JugarMinijuegoDto,
+    @IdentidadActual() identidad: IdentidadExterna,
+  ) {
+    return this.sesiones.jugarMinijuego(codigo, identidad, entrada);
   }
 }

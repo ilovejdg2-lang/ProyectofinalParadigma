@@ -12,6 +12,7 @@ import { ClasificacionPantalla } from '../juego/ClasificacionPantalla.tsx'
 import { EscenarioPartida } from '../juego/EscenarioPartida.tsx'
 import { FeedbackEstudiante } from '../juego/FeedbackEstudiante.tsx'
 import { FlujoIngreso, type FichaIngreso } from '../juego/FlujoIngreso.tsx'
+import { EscenaMinijuego } from '../juego/Minijuegos.tsx'
 import { CuentaRegresiva } from '../juego/CuentaRegresiva.tsx'
 import { FondoJuego } from '../juego/FondoJuego.tsx'
 import { OpcionesJuego } from '../juego/OpcionesJuego.tsx'
@@ -45,6 +46,7 @@ export function Partida() {
     if (!anterior) return
     if (sala.estado === 'pregunta') audio.efecto('jugar', `jugar-${sala.preguntaActual}`)
     if (sala.estado === 'clasificacion') audio.efecto('clasificacion', `clasif-${sala.preguntaActual}`)
+    if (sala.estado === 'minijuego') audio.efecto('suspenso', `mini-${sala.juego?.ronda ?? sala.preguntaActual}`)
     if (sala.estado !== 'cerrada') return
     const pregunta = sala.preguntas[sala.preguntaActual]
     const yo = sala.participantes.find((item) => item.perfilId === perfil.id)
@@ -79,6 +81,7 @@ export function Partida() {
   const restante = sala.cierraEn ? Math.max(0, new Date(sala.cierraEn).getTime() - ahora) : 0
   const tiempoAgotado = sala.estado === 'pregunta' && !enCuenta && sala.cierraEn !== null && restante === 0
   const bloqueada = Boolean(respuesta) || sala.estado !== 'pregunta' || enviando || tiempoAgotado || enCuenta
+  const academico = Boolean(sala.evaluacion) || sala.juego?.modalidad === 'academico'
   const paisaje = paisajeDe(sala, ahora, restante)
   const tension = paisaje === 'suspenso' && restante > 0 && restante <= 10_000
   const enJuego = sala.estado !== 'esperando'
@@ -137,7 +140,7 @@ export function Partida() {
             <p className="meta">Clasificación final</p>
             <h1>{sala.titulo}</h1>
           </header>
-          <Podio participantes={sala.participantes} perfilId={perfil?.id} />
+          <Podio participantes={sala.participantes} perfilId={perfil?.id} academico={academico} total={sala.preguntas.length} />
           <div className="final-acciones">
             <Link className="boton" to={`/resultados/${sala.codigo}`}>Ver reporte</Link>
             <Link className="boton-fantasma" to="/">Salir</Link>
@@ -169,6 +172,17 @@ export function Partida() {
           racha={rachaDe(participante, sala.preguntas)}
         />
       ) : null}
+      {sala.estado === 'minijuego' ? (
+        <EscenaMinijuego
+          sala={sala}
+          ahora={ahora}
+          academico={academico}
+          onJugar={async (accion) => {
+            if (!token) return
+            await cliente.jugarMinijuego(token, sala.codigo, accion)
+          }}
+        />
+      ) : null}
       {pregunta && sala.estado === 'clasificacion' ? (
         <>
           <ClasificacionPantalla participantes={sala.participantes} preguntaId={pregunta.id} perfilId={perfil?.id} />
@@ -193,7 +207,7 @@ export function Partida() {
   }
 
   const faseTexto =
-    sala.estado === 'pregunta' ? 'Pregunta' : sala.estado === 'cerrada' ? 'Resultados' : sala.estado === 'clasificacion' ? 'Clasificación' : 'Podio'
+    sala.estado === 'pregunta' ? 'Pregunta' : sala.estado === 'cerrada' ? 'Resultados' : sala.estado === 'clasificacion' ? 'Clasificación' : sala.estado === 'minijuego' ? 'Minijuego' : 'Podio'
 
   return (
     <EscenarioPartida

@@ -17,7 +17,23 @@ import { CURSO_POR_DEFECTO } from '../cursos/curso-predeterminado';
 import { aciertosAcademicos, aportePorcentual, notaDeAciertos } from './nota-academica';
 import { codigoSala } from './codigo-sala';
 import {
+  ConfigJuego,
+  juegoDeInstantanea,
+  puntosCompetitivos,
+  bonusRacha,
+  fichasEstrellas,
+  parejasValidas,
+  resolverMinijuego,
+  semillaDe,
+  tableroMemoria,
+  siguienteTipo,
+  TipoMinijuego,
+  tocaMinijuego,
+  configInicial,
+} from './minijuegos';
+import {
   FilaPregunta,
+  FilaRespuesta,
   FilaSesion,
   cuentaPendiente,
   instantaneaDe,
@@ -96,6 +112,10 @@ export class SesionesJuegoService implements OnModuleDestroy {
             preguntaActual: 0,
             segundos: SEGUNDOS_SALA,
             ...academica,
+            ...this.datosJuego(
+              config,
+              academica.modoAcademico === 'evaluacion' || config?.modalidad === 'academico',
+            ),
           },
           include: arbol,
         });
@@ -273,10 +293,12 @@ export class SesionesJuegoService implements OnModuleDestroy {
       const segundos = segundosDe(base.preguntas[0]);
       const iniciadaEn = new Date();
       const abreEn = new Date(iniciadaEn.getTime() + MILISEGUNDOS_CUENTA);
+      const juego = juegoDeInstantanea(actual.preguntasInstantanea) ?? this.juegoDeFila(actual);
       const instantanea = {
         ...base,
         abreEn: abreEn.toISOString(),
         puntosPorAcierto: puntosPorAciertoDe(actual.cuestionario?.puntosPorAcierto),
+        juego,
       };
       const cambio = await tx.sesionJuego.updateMany({
         where: { id: actual.id, estado: 'esperando' },
@@ -430,6 +452,11 @@ export class SesionesJuegoService implements OnModuleDestroy {
         normalizado = codigo.trim().toUpperCase();
         await this.bloquear(tx, normalizado);
         const actual = await this.buscarEn(tx, normalizado);
+        if (actual.estado === 'minijuego') {
+          if (!plazoVencido(actual.cierraEn, new Date())) return null;
+          await this.abrirSiguiente(tx, actual);
+          return this.buscarEn(tx, normalizado);
+        }
         if (actual.estado !== 'pregunta') return null;
         if (cuentaPendiente(actual, new Date())) return null;
         if (!plazoVencido(actual.cierraEn, new Date())) return null;
@@ -445,13 +472,24 @@ export class SesionesJuegoService implements OnModuleDestroy {
     }
     if (!cerrada) return;
     this.cancelarCierre(normalizado);
-    this.avisos.confirmar(aviso('pregunta-cerrada', normalizado));
+    const salaAvisada = await this.buscar(normalizado).catch(() => null);
+    if (salaAvisada?.estado === 'pregunta' || salaAvisada?.estado === 'minijuego') {
+      this.programarCierre(salaAvisada.codigo, salaAvisada.cierraEn);
+    }
+    const tipoAviso = salaAvisada?.estado === 'minijuego'
+      ? 'minijuego-iniciado'
+      : salaAvisada?.estado === 'finalizada'
+        ? 'sesion-finalizada'
+        : salaAvisada?.estado === 'pregunta'
+          ? 'pregunta-cambiada'
+          : 'pregunta-cerrada';
+    this.avisos.confirmar(aviso(tipoAviso, normalizado));
   }
 
   async avanzar(
     codigo: string,
     identidad: IdentidadExterna,
-    desde?: 'cerrada' | 'clasificacion',
+    desde?: 'cerrada' | 'clasificacion' | 'minijuego',
   ): Promise<SalaPublica> {
     const sala = await this.transaccion(async (tx) => {
       const normalizado = codigo.trim().toUpperCase();
@@ -484,40 +522,16 @@ export class SesionesJuegoService implements OnModuleDestroy {
         }
         return this.buscarEn(tx, normalizado);
       }
-      if (actual.estado !== 'clasificacion') {
+      if (actual.estado !== 'clasificacion' && actual.estado !== 'minijuego') {
         throw new ConflictException({
           mensaje: 'Cierra la pregunta antes de avanzar.',
         });
       }
-      const instantanea = leerInstantanea(actual.preguntasInstantanea);
-      const preguntas = instantanea?.preguntas ?? [];
-      if (actual.preguntaActual + 1 >= preguntas.length) {
-        await this.finalizar(tx, actual, preguntas.length);
-      } else {
-        const siguiente = preguntas[actual.preguntaActual + 1];
-        const segundos = segundosDe(siguiente);
-        const iniciaEn = new Date();
-        const cambio = await tx.sesionJuego.updateMany({
-          where: {
-            id: actual.id,
-            estado: 'clasificacion',
-            preguntaActual: actual.preguntaActual,
-          },
-          data: {
-            estado: 'pregunta',
-            preguntaActual: actual.preguntaActual + 1,
-            segundos,
-            iniciaEn,
-            cierraEn: new Date(iniciaEn.getTime() + segundos * 1000),
-            elegibles: actual.participantes.map((item) => item.id),
-          },
-        });
-        if (cambio.count !== 1) {
-          throw new ConflictException({
-            mensaje: 'Muestra la clasificación antes de continuar.',
-          });
-        }
+      if (actual.estado === 'clasificacion') {
+        const abierto = await this.abrirMinijuego(tx, actual);
+        if (abierto) return this.buscarEn(tx, normalizado);
       }
+      await this.abrirSiguiente(tx, actual);
       return this.buscarEn(tx, normalizado);
     });
     const tipo =
@@ -525,12 +539,237 @@ export class SesionesJuegoService implements OnModuleDestroy {
         ? 'sesion-finalizada'
         : sala.estado === 'clasificacion'
           ? 'clasificacion-mostrada'
-          : 'pregunta-cambiada';
-    if (sala.estado === 'pregunta') {
+          : sala.estado === 'minijuego'
+            ? 'minijuego-iniciado'
+            : 'pregunta-cambiada';
+    if (sala.estado === 'pregunta' || sala.estado === 'minijuego') {
       this.programarCierre(sala.codigo, sala.cierraEn);
     }
     this.avisos.confirmar(aviso(tipo, sala.codigo));
     return presentarSala(sala, identidad.id);
+  }
+
+  async jugarMinijuego(
+    codigo: string,
+    identidad: IdentidadExterna,
+    accion: { indice?: number; fichas?: string[]; cartas?: number[] },
+  ): Promise<SalaPublica> {
+    const sala = await this.transaccion(async (tx) => {
+      const normalizado = codigo.trim().toUpperCase();
+      await this.bloquear(tx, normalizado);
+      const actual = await this.buscarEn(tx, normalizado);
+      if (actual.estado !== 'minijuego') {
+        throw new ConflictException({ mensaje: 'No hay un minijuego abierto.' });
+      }
+      const participante = actual.participantes.find((item) => item.perfilId === identidad.id);
+      if (!participante) {
+        throw new ForbiddenException({ mensaje: 'No estás en esta sala.' });
+      }
+      const juego = juegoDeInstantanea(actual.preguntasInstantanea);
+      if (!juego?.tipo) {
+        throw new ConflictException({ mensaje: 'El minijuego no está listo.' });
+      }
+      const academico = juego.modalidad === 'academico' || actual.modoAcademico === 'evaluacion';
+      const semilla = semillaDe(actual.id, juego.ronda, identidad.id);
+      const ya = juego.premios.find((premio) => premio.ronda === juego.ronda && premio.perfilId === identidad.id);
+      const repetible = juego.tipo === 'estrellas' || juego.tipo === 'memoria';
+      if (ya && !repetible) return this.buscarEn(tx, normalizado);
+      const accionServidor = this.accionServidor(juego.tipo, semilla, accion, ya, actual);
+      const resultado = resolverMinijuego(juego.tipo, semilla, accionServidor, academico);
+      const puntos = Math.max(ya?.puntos ?? 0, resultado.puntos);
+      const anterior = ya?.puntos ?? 0;
+      const delta = Math.max(0, puntos - anterior);
+      const premio = {
+        perfilId: identidad.id,
+        ronda: juego.ronda,
+        puntos,
+        titulo: resultado.titulo,
+        detalle: {
+          ...resultado.detalle,
+          ...(accionServidor.parejasHalladas ? { parejasHalladas: accionServidor.parejasHalladas } : {}),
+          ...(accionServidor.reveladas ? { reveladas: accionServidor.reveladas } : {}),
+          ...(accionServidor.fichasTomadas ? { fichas: accionServidor.fichasTomadas } : {}),
+        },
+      };
+      const premios = ya
+        ? juego.premios.map((item) => (item === ya ? premio : item))
+        : [...juego.premios, premio];
+      const instantanea = leerInstantanea(actual.preguntasInstantanea);
+      const cambio = await tx.sesionJuego.updateMany({
+        where: { id: actual.id, estado: 'minijuego', preguntaActual: actual.preguntaActual },
+        data: {
+          preguntasInstantanea: { ...instantanea, juego: { ...juego, premios } } as unknown as Prisma.InputJsonValue,
+        },
+      });
+      if (cambio.count !== 1) {
+        throw new ConflictException({ mensaje: 'El minijuego ya cerró.' });
+      }
+      if (delta > 0) {
+        await tx.participante.update({
+          where: { id: participante.id },
+          data: {
+            puntosMinijuegos: (participante.puntosMinijuegos ?? 0) + delta,
+            puntaje: participante.puntaje + delta,
+          },
+        });
+      }
+      return this.buscarEn(tx, normalizado);
+    });
+    this.avisos.confirmar(aviso('minijuego-resuelto', sala.codigo));
+    return presentarSala(sala, identidad.id);
+  }
+
+  private accionServidor(
+    tipo: TipoMinijuego,
+    semilla: number,
+    accion: { indice?: number; fichas?: string[]; cartas?: number[] },
+    ya: { detalle: Record<string, unknown> } | undefined,
+    fila: FilaSesion,
+  ): {
+    indice?: number;
+    capturas?: number;
+    parejas?: number;
+    detenidaEnMs?: number;
+    parejasHalladas?: number[];
+    reveladas?: Array<{ indice: number; simbolo: number }>;
+    fichasTomadas?: string[];
+  } {
+    if (tipo === 'estrellas') {
+      const validas = new Set(fichasEstrellas(semilla));
+      const previas = Array.isArray(ya?.detalle.fichas)
+        ? ya.detalle.fichas.filter((item): item is string => typeof item === 'string' && validas.has(item))
+        : [];
+      const capturas = new Set([...previas, ...(accion.fichas ?? []).filter((id) => validas.has(id))]);
+      return { capturas: capturas.size, fichasTomadas: [...capturas] };
+    }
+    if (tipo === 'memoria') {
+      const previas = Array.isArray(ya?.detalle.parejasHalladas)
+        ? ya.detalle.parejasHalladas.filter((item): item is number => typeof item === 'number')
+        : [];
+      const parejasHalladas = parejasValidas(semilla, accion.cartas, previas);
+      const tablero = tableroMemoria(semilla);
+      const conocidas = Array.isArray(ya?.detalle.reveladas)
+        ? ya.detalle.reveladas.filter(
+            (item): item is { indice: number; simbolo: number } =>
+              !!item && typeof item === 'object' && typeof item.indice === 'number' && typeof item.simbolo === 'number',
+          )
+        : [];
+      const reveladas = new Map(conocidas.map((item) => [item.indice, item.simbolo]));
+      for (const indice of accion.cartas ?? []) {
+        if (Number.isInteger(indice) && indice >= 0 && indice < tablero.length) {
+          reveladas.set(indice, tablero[indice]);
+        }
+      }
+      return {
+        parejas: parejasHalladas.length,
+        parejasHalladas,
+        reveladas: [...reveladas.entries()].map(([indice, simbolo]) => ({ indice, simbolo })),
+      };
+    }
+    if (tipo === 'bomba') {
+      const fin = fila.cierraEn ? new Date(fila.cierraEn).getTime() : Date.now();
+      const juego = juegoDeInstantanea(fila.preguntasInstantanea);
+      const inicio = fin - (juego?.duracion ?? 8) * 1000;
+      return { detenidaEnMs: Date.now() - inicio };
+    }
+    return { indice: accion.indice ?? 0 };
+  }
+
+  private async abrirMinijuego(
+    tx: ClienteSesion,
+    actual: FilaSesion & { id: string },
+  ): Promise<boolean> {
+    const instantanea = leerInstantanea(actual.preguntasInstantanea);
+    const juego = juegoDeInstantanea(actual.preguntasInstantanea);
+    const total = instantanea?.preguntas.length ?? 0;
+    if (!juego || !tocaMinijuego(juego, actual.preguntaActual, total) || !instantanea) return false;
+    const tipo = siguienteTipo(juego);
+    const iniciaEn = new Date();
+    const cambio = await tx.sesionJuego.updateMany({
+      where: { id: actual.id, estado: 'clasificacion', preguntaActual: actual.preguntaActual },
+      data: {
+        estado: 'minijuego',
+        iniciaEn,
+        cierraEn: new Date(iniciaEn.getTime() + juego.duracion * 1000),
+        preguntasInstantanea: {
+          ...instantanea,
+          juego: { ...juego, tipo, ronda: juego.ronda + 1 },
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+    if (cambio.count !== 1) {
+      throw new ConflictException({ mensaje: 'La partida ya avanzó.' });
+    }
+    return true;
+  }
+
+  private async abrirSiguiente(
+    tx: ClienteSesion,
+    actual: FilaSesion & { id: string },
+  ): Promise<void> {
+    const instantanea = leerInstantanea(actual.preguntasInstantanea);
+    const preguntas = instantanea?.preguntas ?? [];
+    if (actual.preguntaActual + 1 >= preguntas.length) {
+      await this.finalizar(tx, actual, preguntas.length);
+      return;
+    }
+    const siguiente = preguntas[actual.preguntaActual + 1];
+    const segundos = segundosDe(siguiente);
+    const iniciaEn = new Date();
+    const cambio = await tx.sesionJuego.updateMany({
+      where: { id: actual.id, estado: actual.estado, preguntaActual: actual.preguntaActual },
+      data: {
+        estado: 'pregunta',
+        preguntaActual: actual.preguntaActual + 1,
+        segundos,
+        iniciaEn,
+        cierraEn: new Date(iniciaEn.getTime() + segundos * 1000),
+        elegibles: actual.participantes.map((item) => item.id),
+      },
+    });
+    if (cambio.count !== 1) {
+      throw new ConflictException({ mensaje: 'Muestra la clasificación antes de continuar.' });
+    }
+  }
+
+  private datosJuego(config: ConfiguracionAcademica | undefined, academico: boolean) {
+    const competitivo = !academico && (config?.modalidad === 'competitivo' || config?.velocidadActiva === true || config?.minijuegosActivos === true);
+    if (!academico && !competitivo && !config?.minijuegosActivos) return {};
+    const juego = configInicial(
+      {
+        activos: config?.minijuegosActivos,
+        tipos: config?.tiposMinijuego,
+        cada: config?.cadaPreguntas,
+        duracion: config?.duracionMinijuego,
+        velocidad: config?.velocidadActiva,
+        modalidad: academico ? 'academico' : 'competitivo',
+      },
+      academico,
+    );
+    return {
+      modalidad: juego.modalidad,
+      minijuegosActivos: juego.activos,
+      tiposMinijuego: juego.tipos,
+      cadaPreguntas: juego.cada,
+      duracionMinijuego: juego.duracion,
+      velocidadActiva: juego.velocidad,
+      preguntasInstantanea: { version: 1, preguntas: [], juego } as unknown as Prisma.InputJsonValue,
+    };
+  }
+
+  private juegoDeFila(fila: FilaSesion): ConfigJuego | undefined {
+    if (fila.modalidad !== 'academico' && fila.modalidad !== 'competitivo') return undefined;
+    const academico = fila.modalidad === 'academico' || fila.modoAcademico === 'evaluacion';
+    return configInicial(
+      {
+        activos: fila.minijuegosActivos,
+        tipos: fila.tiposMinijuego as TipoMinijuego[] | undefined,
+        cada: fila.cadaPreguntas,
+        duracion: fila.duracionMinijuego,
+        velocidad: fila.velocidadActiva,
+      },
+      academico,
+    );
   }
 
   private programarCierre(
@@ -668,36 +907,57 @@ export class SesionesJuegoService implements OnModuleDestroy {
         ? new Date(fila.cierraEn).getTime() - limite
         : Date.now();
     const valorAcierto = puntosDeSala(fila);
+    const juego = juegoDeInstantanea(fila.preguntasInstantanea);
+    const competitivo = juego?.modalidad === 'competitivo' && fila.modoAcademico !== 'evaluacion';
     const rapidez = new Map<string, number>();
+    const velocidadPorParticipante = new Map<string, number>();
     for (const respuesta of deLaPregunta) {
       if (respuesta.puntos > 0) continue;
-      const puntos = puntosDeRespuesta(esAcierto(pregunta, respuesta), valorAcierto);
-      if (puntos === 0) continue;
+      const acierto = esAcierto(pregunta, respuesta);
       const transcurrido = Math.max(
         0,
         new Date(respuesta.respondidaEn ?? inicio).getTime() - inicio,
       );
+      let puntos = puntosDeRespuesta(acierto, valorAcierto);
+      let velocidad = 0;
+      if (competitivo) {
+        const calculo = puntosCompetitivos(acierto, transcurrido, limite, juego?.velocidad !== false);
+        const dueno = fila.participantes.find((item) => item.id === respuesta.participanteId);
+        const racha = rachaCorrecta(dueno?.respuestas ?? [], pregunta.id, acierto);
+        puntos = calculo.total + bonusRacha(racha, true);
+        velocidad = calculo.velocidad;
+      }
+      if (puntos === 0 && !acierto) continue;
       await tx.respuesta.update({
         where: { id: respuesta.id },
         data: { puntos },
       });
-      rapidez.set(
-        respuesta.participanteId,
-        (rapidez.get(respuesta.participanteId) ?? 0) + transcurrido,
-      );
+      respuesta.puntos = puntos;
+      if (acierto) {
+        rapidez.set(
+          respuesta.participanteId,
+          (rapidez.get(respuesta.participanteId) ?? 0) + transcurrido,
+        );
+      }
+      if (velocidad > 0) {
+        velocidadPorParticipante.set(respuesta.participanteId, velocidad);
+      }
     }
     for (const participante of fila.participantes) {
       const suyas = await tx.respuesta.findMany({
         where: { participanteId: participante.id },
       });
-      const puntaje = suyas.reduce((suma, item) => suma + item.puntos, 0);
+      const base = suyas.reduce((suma, item) => suma + item.puntos, 0);
+      const minijuegos = competitivo ? participante.puntosMinijuegos ?? 0 : 0;
       const aciertos = suyas.filter((item) => item.puntos > 0).length;
       await tx.participante.update({
         where: { id: participante.id },
         data: {
-          puntaje,
+          puntaje: base + minijuegos,
           aciertos,
           tiempoMs: (participante.tiempoMs ?? 0) + (rapidez.get(participante.id) ?? 0),
+          bonificacionVelocidad:
+            (participante.bonificacionVelocidad ?? 0) + (velocidadPorParticipante.get(participante.id) ?? 0),
         },
       });
     }
@@ -906,6 +1166,12 @@ export interface ConfiguracionAcademica {
   notaMaxima?: number;
   valorPorcentaje?: number;
   notaMinima?: number;
+  modalidad?: 'academico' | 'competitivo';
+  minijuegosActivos?: boolean;
+  tiposMinijuego?: TipoMinijuego[];
+  cadaPreguntas?: number;
+  duracionMinijuego?: number;
+  velocidadActiva?: boolean;
 }
 
 interface ClienteAcademico {
@@ -1019,6 +1285,8 @@ interface ClienteSesion {
         puntaje?: number;
         aciertos?: number;
         tiempoMs?: number;
+        puntosMinijuegos?: number;
+        bonificacionVelocidad?: number;
       };
     }): Promise<unknown>;
     updateMany(args: {
@@ -1112,6 +1380,17 @@ function segundosDe(pregunta: PreguntaInstantanea | undefined): number {
   if (!Number.isInteger(segundos) || segundos < 5 || segundos > 120)
     return SEGUNDOS_SALA;
   return segundos;
+}
+
+function rachaCorrecta(respuestas: FilaRespuesta[], preguntaId: string, acierto: boolean): number {
+  const previas = [...respuestas]
+    .filter((item) => item.preguntaId !== preguntaId && item.aceptada !== false)
+    .sort(
+      (a, b) => new Date(a.respondidaEn ?? 0).getTime() - new Date(b.respondidaEn ?? 0).getTime(),
+    );
+  let racha = 0;
+  for (const item of previas) racha = item.puntos > 0 ? racha + 1 : 0;
+  return acierto ? racha + 1 : 0;
 }
 
 function aviso(tipo: CambioSesion, codigo: string) {
